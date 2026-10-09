@@ -1,4 +1,4 @@
-package org.firstinspires.ftc.teamcode.Auton.TwelveBall;
+package org.firstinspires.ftc.teamcode.Auton.FarAuton;
 
 import com.bylazar.configurables.annotations.Configurable;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
@@ -7,14 +7,14 @@ import org.firstinspires.ftc.teamcode.AllianceColor;
 import org.firstinspires.ftc.teamcode.Robot;
 
 @Configurable
-@Autonomous(name = "RED CLOSE 12", group = "RED")
-public class RedClose12Indexed extends LinearOpMode {
+@Autonomous(name = "RED FAR CONFIGURABLE", group = "RED")
+public class RedFar15Configurable extends LinearOpMode {
 
-  public static double[] SHOOT_RED = {78, 86, 41};
+  public static double[] SHOOT_RED = {90, 15, 67};
 
   @Override
   public void runOpMode() throws InterruptedException {
     Robot robot = new Robot(this, AllianceColor.RED);
-    new BaseClose12Indexed(this, robot, SHOOT_RED).run();
+    new BaseFar15(this, robot, SHOOT_RED).run();
   }
 }

@@ -14,36 +14,40 @@ import com.qualcomm.robotcore.hardware.HardwareMap;
 
 public class Constants {
 
-  public static FollowerConstants followerConstants = new FollowerConstants().mass(11.285)
-      .forwardZeroPowerAcceleration(-41.2).lateralZeroPowerAcceleration(-67.735)
+  public static FollowerConstants followerConstants = new FollowerConstants()
+      .mass(12.345)
+      .forwardZeroPowerAcceleration(-57.3022).lateralZeroPowerAcceleration(-64.598)
       .headingPIDFCoefficients(new PIDFCoefficients(1.6, 0, .07, 0))
-      .translationalPIDFCoefficients(new PIDFCoefficients(.18, 0, 0.02, 0))
-      .drivePIDFCoefficients(new FilteredPIDFCoefficients(0.0072, 0, 0.001, .6, .0)); // .18, .00003
+      .translationalPIDFCoefficients(new PIDFCoefficients(.14, 0, 0.02, 0.02))
+      .drivePIDFCoefficients(new FilteredPIDFCoefficients(0.018, 0, 0.0009, .6, .0)); // .0072
+
   public static MecanumConstants driveConstants = new MecanumConstants()
       .maxPower(1)
       .rightFrontMotorName("fr")
       .rightRearMotorName("br")
       .leftRearMotorName("bl")
       .leftFrontMotorName("fl")
-      .xVelocity(81.161)
-      .yVelocity(67.146)
+      .xVelocity(80.21)
+      .yVelocity(65.9686)
       .leftFrontMotorDirection(DcMotorSimple.Direction.REVERSE)
       .leftRearMotorDirection(DcMotorSimple.Direction.REVERSE)
       .rightFrontMotorDirection(DcMotorSimple.Direction.FORWARD)
       .rightRearMotorDirection(DcMotorSimple.Direction.FORWARD);
+
   public static ThreeWheelConstants localizerConstants = new ThreeWheelConstants()
       .forwardTicksToInches(.001989436789)
       .strafeTicksToInches(.001989436789)
-      .turnTicksToInches(-.001989436789)
+      .turnTicksToInches(.001989436789)
       .leftPodY(7.5)
       .rightPodY(-7.5)
-      .strafePodX(-2.5)
-      .leftEncoder_HardwareMapName("br")
-      .rightEncoder_HardwareMapName("fl")
-      .strafeEncoder_HardwareMapName("intakealt")
+      .strafePodX(-2)
+      .leftEncoder_HardwareMapName("fl")
+      .rightEncoder_HardwareMapName("fr")
+      .strafeEncoder_HardwareMapName("flywheel2")
       .leftEncoderDirection(Encoder.REVERSE)
       .rightEncoderDirection(Encoder.REVERSE)
       .strafeEncoderDirection(Encoder.REVERSE);
+
   public static PathConstraints pathConstraints = new PathConstraints(0.99, 100, 1, 1);
 
   public static Follower createFollower(HardwareMap hardwareMap) {

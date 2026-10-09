@@ -7,8 +7,6 @@ import com.qualcomm.robotcore.hardware.DcMotor.ZeroPowerBehavior;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple.Direction;
 import com.qualcomm.robotcore.hardware.HardwareMap;
-import com.qualcomm.robotcore.hardware.Servo;
-import com.qualcomm.robotcore.hardware.ServoImplEx;
 import com.qualcomm.robotcore.util.Range;
 
 @Configurable
@@ -16,43 +14,55 @@ public class Outtake {
 
   // --- PID constants (tune in Panels) ---
 
-  public static int medSpeed = 1340; // 1340
-  public static int farSpeed = 1600;
+  public static int medSpeed = 1280; //1380
+  public static int farSpeed = 1640;
 
   public static int cycleSpeed = 300;
-  public static double kP = 0.002; // .0025 //m001
-  public static double kV = 0.00039; // .00037
+  public static double kP = 0.003;
+  public static double kV = 0.0004348;
 
 
-  public static double SHOOT_POS = 0.7;
-  public static double SHOOT_BASE = 0.95;
+  public static Direction flywheel1MotorDirection = Direction.FORWARD;
+  public static Direction flywheel2MotorDirection = Direction.REVERSE;
 
-  public static Direction flywheelMotorDirection = Direction.REVERSE;
 
   // --- Variables ---
   private double targetVelocity = 0; // ticks/sec
 
   // --- Hardware ---
-  public DcMotorEx flywheel;
-  public ServoImplEx flapper;
-  public final Servo rgb;
+  public DcMotorEx flywheel1;
+  public DcMotorEx flywheel2;
+
+  public DcMotorEx turret;
+
+
   private double currentVelocity;
 
   // --- Constructor ---
   public Outtake(LinearOpMode opMode) {
     HardwareMap hardwareMap = opMode.hardwareMap;
-    rgb = hardwareMap.servo.get("rgb");
-    rgb.setPosition(.5);
-    flywheel = hardwareMap.get(DcMotorEx.class, "flywheel");
-    flywheel.setDirection(flywheelMotorDirection);
-    flywheel.setZeroPowerBehavior(ZeroPowerBehavior.FLOAT);
-    flywheel.setMode(RunMode.RUN_WITHOUT_ENCODER);
-    flapper = hardwareMap.get(ServoImplEx.class, "flapper");
 
+    flywheel2 = hardwareMap.get(DcMotorEx.class, "flywheel2");
+    flywheel2.setDirection(flywheel2MotorDirection);
+    flywheel2.setZeroPowerBehavior(ZeroPowerBehavior.FLOAT);
+    flywheel2.setMode(RunMode.RUN_WITHOUT_ENCODER);
+
+    flywheel1 = hardwareMap.get(DcMotorEx.class, "flywheel1");
+    flywheel1.setDirection(flywheel1MotorDirection);
+    flywheel1.setZeroPowerBehavior(ZeroPowerBehavior.FLOAT);
+    flywheel1.setMode(RunMode.RUN_WITHOUT_ENCODER);
+
+    turret = hardwareMap.get(DcMotorEx.class, "turret");
+    turret.setDirection(Direction.REVERSE);
+    turret.setZeroPowerBehavior(ZeroPowerBehavior.BRAKE);
+    turret.setMode(RunMode.STOP_AND_RESET_ENCODER);
+    turret.setMode(RunMode.RUN_WITHOUT_ENCODER);
   }
 
+
   public void setPower(double pow) {
-    this.flywheel.setPower(pow);
+    this.flywheel1.setPower(pow);
+    this.flywheel2.setPower(pow);
   }
 
   // --- Set target velocity ---
@@ -60,34 +70,16 @@ public class Outtake {
     targetVelocity = Math.max(targetTicksPerSec, 0);
   }
 
-  public void setShoot() {
-    flapper.setPosition(SHOOT_POS);
-  }
-
-  public void setBase() {
-    flapper.setPosition(SHOOT_BASE);
-  }
-
-  public void setServoPos(double pos) {
-    flapper.setPosition(pos);
-  }
 
   // --- Main PID update loop ---
   public double updatePIDControl() {
-    if (this.atTarget(20) && targetVelocity != 0) {
-      rgb.setPosition(.5);
-    } else if (this.atTarget(100) && targetVelocity != 0) {
-      rgb.setPosition(.375);
-    } else {
-      rgb.setPosition(.3);
-    }
-    this.currentVelocity = this.flywheel.getVelocity(); // ticks/sec
+    this.currentVelocity = this.flywheel1.getVelocity(); // ticks/sec
     double error = this.targetVelocity - this.currentVelocity;
 
     double output = (kV * this.targetVelocity) + (kP * error);
 
     // limit power range
-    output = Range.clip(output, -0.2, 1.0);
+    output = Range.clip(output, -.2, 1.0);
 
     this.setPower(output);
     return output;
@@ -107,6 +99,14 @@ public class Outtake {
 
   public double getTargetVelocity() {
     return this.targetVelocity;
+  }
+
+  public void setPowerTurret(double pow) {
+    turret.setPower(pow);
+  }
+
+  public double getTurretPosDegrees() {
+    return turret.getCurrentPosition() / 2.6701388889;
   }
 
   public void stop() {

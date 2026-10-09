@@ -43,9 +43,10 @@ public class SensorTest extends LinearOpMode {
           int id = fiducial.getFiducialId(); // The ID number of the fiducial
           telemetry.addData("Tag ", id);
         }
-      }
 
-      telemetry.addData("INTAKE COLOR", robot.intake.updateSampleColor());
+      }
+      telemetry.addData("turretPosDegrees", robot.outtake.getTurretPosDegrees());
+
       telemetry.update();
     }
   }
