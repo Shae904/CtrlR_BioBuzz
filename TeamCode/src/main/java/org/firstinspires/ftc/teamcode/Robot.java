@@ -23,6 +23,8 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
 
 public class Robot {
 
+  // Dunno where to put this so
+  // TODO: Migrate codebase to RobotController Version 12.0
   private final List<LynxModule> hubs;
   public Follower follower;
   public DcMotor fr, fl, br, bl;
