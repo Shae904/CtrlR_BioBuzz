@@ -14,8 +14,10 @@ public class Outtake {
 
   // --- PID constants (tune in Panels) ---
 
-  public static int medSpeed = 1280; //1380
-  public static int farSpeed = 1640;
+  // BIOBUZZ presets from the shot model (Limelight.SHOT_*): med ~2.0 m, far ~3.2 m camera -> CELL opening
+  // (DECODE values were 1280 / 1640)
+  public static int medSpeed = 1400;
+  public static int farSpeed = 1560;
 
   public static int cycleSpeed = 300;
   public static double kP = 0.003;
