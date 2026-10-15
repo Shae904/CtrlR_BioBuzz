@@ -31,7 +31,7 @@ public class Limelight {
   //   red scoring 30-33, red audience 34-37, blue audience 38-41, blue scoring 42-45
   // Heights/offsets come from the official field CAD (floor = top of tiles).
   public static double LENS_HEIGHT_M = 0.427;          // Limelight lens above floor (turret CAD on Worlds Bot)
-  public static double CAM_PITCH_DEG = 0.0;            // Limelight pitch, + = tilted up (CAD: level)
+  public static double CAM_PITCH_DEG = 35.0;           // Limelight lens axis above horizontal (new tilted mount; was level)
   public static double UP_CELL_TAG_HEIGHT_M = 1.261;   // tag cluster height when its CELL faces up (the scoring target)
   public static double DOWN_CELL_TAG_HEIGHT_M = 0.905; // tag cluster height when its CELL faces down
   public static double OPENING_BEYOND_TAGS_M = 0.152;  // CELL opening centre is this much farther (horizontally) than its tags
@@ -125,11 +125,20 @@ public class Limelight {
         continue;
       }
       int cell = (id - 30) / 4; // 0: red scoring, 1: red audience, 2: blue audience, 3: blue scoring
+      // Ray to the tag, rotated from the tilted camera into a level frame
+      // (camera space: +x right, +y down, +z out of the lens; tx/ty are pinhole angles)
+      double tanTx = Math.tan(Math.toRadians(tag.getTargetXDegrees()));
+      double tanTy = Math.tan(Math.toRadians(tag.getTargetYDegrees()));
+      double rayFwd = Math.cos(pitch) - tanTy * Math.sin(pitch);
+      double rayUp = Math.sin(pitch) + tanTy * Math.cos(pitch);
+      double rayHoriz = Math.hypot(tanTx, rayFwd);
+      // True horizontal bearing (what tx meant when the camera was level, so aim tuning still applies)
+      double bearing = Math.toDegrees(Math.atan2(tanTx, rayFwd));
       double dist = Double.NaN;
       Pose3D pose = tag.getTargetPoseCameraSpace();
       if (pose != null) {
         Position p = pose.getPosition().toUnit(DistanceUnit.METER);
-        if (p.z > 0.05) { // Limelight camera space: +x right, +y down, +z out of the lens
+        if (p.z > 0.05) {
           double fwd = p.z * Math.cos(pitch) + p.y * Math.sin(pitch);
           double up = p.z * Math.sin(pitch) - p.y * Math.cos(pitch);
           dist = Math.hypot(p.x, fwd);
@@ -138,14 +147,13 @@ public class Limelight {
         }
       }
       if (Double.isNaN(dist)) { // no 3D pose: assume this cluster is on the upward CELL
-        double angle = Math.toRadians(tag.getTargetYDegrees()) + pitch;
-        if (angle <= 0.01) {
+        if (rayUp <= 0.01) {
           continue;
         }
-        dist = (UP_CELL_TAG_HEIGHT_M - LENS_HEIGHT_M) / Math.tan(angle);
+        dist = (UP_CELL_TAG_HEIGHT_M - LENS_HEIGHT_M) * rayHoriz / rayUp;
       }
       sumDist[cell] += dist;
-      sumTx[cell] += tag.getTargetXDegrees();
+      sumTx[cell] += bearing;
       sumTy[cell] += tag.getTargetYDegrees();
       count[cell]++;
     }
