@@ -43,7 +43,7 @@ public class Intake {
   private int remainingCycles = 0;
 
 
-  public ServoImplEx gate;
+  // public ServoImplEx gate;
   public ServoImplEx cycler;
 
   public enum FlapperState {CYCLE, SHOOT, LOCKED}
@@ -59,7 +59,7 @@ public class Intake {
 
     intakeMotor.setMode(RunMode.RUN_WITHOUT_ENCODER);
 
-    gate = hardwareMap.get(ServoImplEx.class, "flapper");
+    // gate = hardwareMap.get(ServoImplEx.class, "flapper");
     cycler = hardwareMap.get(ServoImplEx.class, "cycler");
   }
 
@@ -80,7 +80,7 @@ public class Intake {
   }
 
   public void setFlapperPos(double pos) {
-    gate.setPosition(pos);
+    // gate.setPosition(pos);
   }
 
   public void setCyclerPos(double pos) {
