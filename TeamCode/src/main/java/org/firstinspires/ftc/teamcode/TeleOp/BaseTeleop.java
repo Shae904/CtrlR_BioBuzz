@@ -105,10 +105,6 @@ public class BaseTeleop {
         robot.setTiltFolded();
       }
 
-      if (this.opMode.gamepad1.dpad_up) {
-        // TODO: implement ?
-      }
-
       // TELEMETRY
       updateTelemetry();
     }
