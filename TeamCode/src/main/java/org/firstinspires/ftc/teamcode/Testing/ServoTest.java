@@ -7,7 +7,7 @@ import org.firstinspires.ftc.teamcode.Robot;
 import org.firstinspires.ftc.teamcode.Subsystems.Intake;
 
 @Configurable
-@TeleOp(name = "SERVO TESTING", group = "TESTING")
+@TeleOp(name = "MOTOR TESTING", group = "TESTING")
 public class ServoTest extends LinearOpMode {
 
   Robot robot;
@@ -55,6 +55,11 @@ public class ServoTest extends LinearOpMode {
         robot.outtake.setPowerTurret(1);
       } else {
         robot.outtake.setPowerTurret(0);
+      }
+      if (gamepad1.left_bumper){
+        robot.intake.setIntakePower(1);
+      } else {
+        robot.intake.setIntakePower(0);
       }
 
     }
