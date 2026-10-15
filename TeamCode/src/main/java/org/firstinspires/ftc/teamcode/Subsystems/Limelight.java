@@ -99,6 +99,7 @@ public class Limelight {
     double calculatedVel;
     if (this.hasValidTarget()) {
 
+      // Power Equation (CHANGE THIS)
       calculatedVel = (20.0 * (Math.round(
           (((distance * Math.pow(0.243301244553 * distance - 0.173469387755, -0.5)) / 0.0025344670037)
               - (vParallel * 93 * Math.cos(Math.toRadians(50)))) // 253
