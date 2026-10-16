@@ -9,7 +9,6 @@ import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.util.ElapsedTime;
 import com.qualcomm.robotcore.util.Range;
-import java.util.List;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.Pose3D;
 import org.firstinspires.ftc.robotcore.external.navigation.Position;
@@ -307,18 +306,6 @@ public class Limelight {
     return output;   // return turn power
   }
 
-
-  public int getPatternIdAuto() { // only for auto just returns the tag id for patterns
-    this.limelight.pipelineSwitch(0);
-    LLResult result = this.limelight.getLatestResult();
-    List<FiducialResult> fiducials = result.getFiducialResults();
-    if (result.isValid()) {
-      for (FiducialResult fiducial : fiducials) {
-        return fiducial.getFiducialId();
-      }
-    }
-    return 21;
-  }
 
   public void setPipeline(AllianceColor color) {
     this.limelight.pipelineSwitch(color.getLLPipelineTeleOP());

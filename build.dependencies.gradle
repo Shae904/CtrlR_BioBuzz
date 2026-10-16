@@ -2,7 +2,7 @@ repositories {
     mavenCentral()
     google() // Needed for androidx
     maven { url = "https://mymaven.bylazar.com/releases" } // Panels
-    maven { url = "https://repo.dairy.foundation/releases" } // Sloth, which Panels needs on SDK 12
+    maven { url = "https://repo.dairy.foundation/releases" } // Sloth (Panels on SDK 12, Pedro tuning)
 }
 
 dependencies {
@@ -16,9 +16,9 @@ dependencies {
     implementation 'org.firstinspires.ftc:Vision:12.0.0'
     implementation 'androidx.appcompat:appcompat:1.2.0'
 
-    // Pedro Pathing 2.x (what the robot is tuned on). Pedro 3 is a rewrite with a new API.
-    implementation 'com.pedropathing:ftc:2.0.6'
-    implementation 'com.pedropathing:telemetry:1.0.0'
+    // Pedro Pathing 3 (Foresight follower + AutoTune). revhub brings core; tuning needs Sloth from the Dairy repo.
+    implementation 'com.pedropathing:revhub:3.0.2'
+    implementation 'com.pedropathing:tuning:1.0.2'
     // Panels: 1.0.15+ is required on SDK 12 (older versions break @Configurable).
     implementation 'com.bylazar:fullpanels:1.0.18'
 }

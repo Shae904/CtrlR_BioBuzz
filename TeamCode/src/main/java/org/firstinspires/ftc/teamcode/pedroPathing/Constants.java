@@ -1,60 +1,103 @@
 package org.firstinspires.ftc.teamcode.pedroPathing;
 
-import com.pedropathing.control.FilteredPIDFCoefficients;
-import com.pedropathing.control.PIDFCoefficients;
+import com.pedropathing.algorithm.Foresight;
+import com.pedropathing.algorithm.ForesightConfig;
+import com.pedropathing.controllers.Controller;
+import com.pedropathing.drivetrain.Drivetrain;
 import com.pedropathing.follower.Follower;
-import com.pedropathing.follower.FollowerConstants;
-import com.pedropathing.ftc.FollowerBuilder;
-import com.pedropathing.ftc.drivetrains.MecanumConstants;
-import com.pedropathing.ftc.localization.Encoder;
-import com.pedropathing.ftc.localization.constants.ThreeWheelConstants;
-import com.pedropathing.paths.PathConstraints;
+import com.pedropathing.localization.Localizer;
+import com.pedropathing.math.Matrix;
+import com.pedropathing.math.Vector2D;
+import com.pedropathing.revhub.drivetrains.Mecanum;
+import com.pedropathing.revhub.drivetrains.MecanumConfig;
+import com.pedropathing.revhub.localizers.Encoder;
+import com.pedropathing.revhub.localizers.ThreeWheelConfig;
+import com.pedropathing.revhub.localizers.ThreeWheelLocalizer;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 
+/**
+ * Pedro Pathing 3.0.2 constants for the BIOBUZZ robot (migrated from the 2.0.6 FollowerConstants / MecanumConstants /
+ * ThreeWheelConstants / PathConstraints). Values marked "2.x" are carried over unchanged; values marked "ESTIMATE" have
+ * no 2.x equivalent and must be replaced by the AutoTune Foresight Tuner's generated block before any path is run.
+ */
 public class Constants {
 
-  public static FollowerConstants followerConstants = new FollowerConstants()
-      .mass(12.345)
-      .forwardZeroPowerAcceleration(-57.3022).lateralZeroPowerAcceleration(-64.598)
-      .headingPIDFCoefficients(new PIDFCoefficients(1.6, 0, .07, 0))
-      .translationalPIDFCoefficients(new PIDFCoefficients(.14, 0, 0.02, 0.02))
-      .drivePIDFCoefficients(new FilteredPIDFCoefficients(0.018, 0, 0.0009, .6, .0)); // .0072
+  // ---- Drivetrain (2.x MecanumConstants) -------------------------------------------------------------------------
+  public static MecanumConfig drivetrainConfig = new MecanumConfig(c -> {
+    c.frontLeftName.set("fl");                                 // 2.x leftFrontMotorName("fl")
+    c.backLeftName.set("bl");                                  // 2.x leftRearMotorName("bl")
+    c.frontRightName.set("fr");                                // 2.x rightFrontMotorName("fr")
+    c.backRightName.set("br");                                 // 2.x rightRearMotorName("br")
+    c.frontLeftDirection.set(DcMotorSimple.Direction.REVERSE); // 2.x leftFrontMotorDirection
+    c.backLeftDirection.set(DcMotorSimple.Direction.REVERSE);  // 2.x leftRearMotorDirection
+    c.frontRightDirection.set(DcMotorSimple.Direction.FORWARD);// 2.x rightFrontMotorDirection
+    c.backRightDirection.set(DcMotorSimple.Direction.FORWARD); // 2.x rightRearMotorDirection
+    c.manualBrakeMode.set(true);   // keep true: an idle follower.update() calls stop(), which sets BRAKE here; with
+                                   // false it would switch the teleop drive motors to FLOAT every loop (Robot sets BRAKE)
+    c.powerThreshold.set(0.01);    // 3.x default; CachedMotor skips writes smaller than this
+    // 2.x maxPower(1): no 3.x equivalent (Mecanum always normalises to |power| <= 1); cap speed with
+    //   foresightConfig.maxPathSpeed instead.
+    // 2.x xVelocity / yVelocity: moved to foresightConfig.maxAchievable{Forward,Strafe}Velocity below.
+  });
 
-  public static MecanumConstants driveConstants = new MecanumConstants()
-      .maxPower(1)
-      .rightFrontMotorName("fr")
-      .rightRearMotorName("br")
-      .leftRearMotorName("bl")
-      .leftFrontMotorName("fl")
-      .xVelocity(80.21)
-      .yVelocity(65.9686)
-      .leftFrontMotorDirection(DcMotorSimple.Direction.REVERSE)
-      .leftRearMotorDirection(DcMotorSimple.Direction.REVERSE)
-      .rightFrontMotorDirection(DcMotorSimple.Direction.FORWARD)
-      .rightRearMotorDirection(DcMotorSimple.Direction.FORWARD);
+  // ---- Localizer (2.x ThreeWheelConstants) ------------------------------------------------------------------------
+  public static ThreeWheelConfig localizerConfig = new ThreeWheelConfig(c -> {
+    c.leftEncoderName.set("fl");                    // 2.x leftEncoder_HardwareMapName
+    c.rightEncoderName.set("fr");                   // 2.x rightEncoder_HardwareMapName
+    c.strafeEncoderName.set("flywheel2");           // 2.x strafeEncoder_HardwareMapName
+    c.leftPodY.set(7.5);                            // 2.x leftPodY
+    c.rightPodY.set(-7.5);                          // 2.x rightPodY
+    c.strafePodX.set(-2.0);                         // 2.x strafePodX(-2): must be a double literal (ConfigVar<Double>)
+    c.forwardTicksToInches.set(0.001989436789);     // 2.x forwardTicksToInches
+    c.strafeTicksToInches.set(0.001989436789);      // 2.x strafeTicksToInches
+    c.turnTicksToRadians.set(0.001989436789);       // 2.x turnTicksToInches: renamed, identical formula
+    c.leftEncoderDirection.set(Encoder.REVERSE);    // 2.x Encoder.REVERSE (-1.0)
+    c.rightEncoderDirection.set(Encoder.REVERSE);
+    c.strafeEncoderDirection.set(Encoder.REVERSE);
+  });
 
-  public static ThreeWheelConstants localizerConstants = new ThreeWheelConstants()
-      .forwardTicksToInches(.001989436789)
-      .strafeTicksToInches(.001989436789)
-      .turnTicksToInches(.001989436789)
-      .leftPodY(7.5)
-      .rightPodY(-7.5)
-      .strafePodX(-2)
-      .leftEncoder_HardwareMapName("fl")
-      .rightEncoder_HardwareMapName("fr")
-      .strafeEncoder_HardwareMapName("flywheel2")
-      .leftEncoderDirection(Encoder.REVERSE)
-      .rightEncoderDirection(Encoder.REVERSE)
-      .strafeEncoderDirection(Encoder.REVERSE);
+  // ---- Algorithm (2.x FollowerConstants + PathConstraints) --------------------------------------------------------
+  public static ForesightConfig foresightConfig = new ForesightConfig(c -> {
+    // Same physical quantities, measured the same way by the 2.x and 3.x tuners:
+    c.maxAchievableForwardVelocity.set(80.21);      // 2.x MecanumConstants.xVelocity (in/s)
+    c.maxAchievableStrafeVelocity.set(65.9686);     // 2.x MecanumConstants.yVelocity (in/s)
+    c.naturalForwardDeceleration.set(57.3022);      // 2.x forwardZeroPowerAcceleration(-57.3022), sign flipped
+    c.naturalStrafeDeceleration.set(64.598);        // 2.x lateralZeroPowerAcceleration(-64.598), sign flipped
 
-  public static PathConstraints pathConstraints = new PathConstraints(0.99, 100, 1, 1);
+    // 2.x PIDF gains as stateless bring-up controllers (Foresight evaluates heading twice per update, so a stateful
+    // Controller.pid(...) D term would differentiate across two different errors; AutoTune emits proportional ones):
+    c.headingFeedback.set(Controller.proportional(1.6));   // 2.x headingPIDF P=1.6 (D=0.07 dropped, F=0)
+    c.forwardTranslational.set(                             // 2.x translationalPIDF P=0.14, F=0.02 (D=0.02 dropped)
+        Controller.proportional(0.14).plus(Controller.staticFeedforward(0.02)));
+    c.strafeTranslational.set(
+        Controller.proportional(0.14).plus(Controller.staticFeedforward(0.02)));
 
+    // ESTIMATE (no 2.x equivalent; 2.x drivePIDF and mass have none): velocity -> power maps and brake model.
+    c.coast.set(Controller.proportionalFeedforward(1.0 / 80.21));   // ~1/maxForwardVelocity
+    c.brake.set(Controller.proportionalFeedforward(1.0 / 80.21));
+    // Stopping distance d(v) = linear*v + quadratic*v|v| per body axis. Seeded with the 2.x zero-power (coast) model
+    // d = v^2 / (2 * natural decel): over-predicts the braked distance, so the robot starts braking early (safe).
+    c.linearBrakeCoefficients.set(Matrix.diag(0.0, 0.0));
+    c.quadraticBrakeCoefficients.set(Matrix.diag(1.0 / (2 * 57.3022), 1.0 / (2 * 64.598)));
+    c.headingBrakeCoefficients.set(Vector2D.cartesian(0.0, 0.0));   // no heading-stop prediction until tuned
+
+    // 2.x PathConstraints(0.99, 100, 1, 1): tValue 0.99 -> 1 - 0.99; velocity 0.1 / translational 0.1 /
+    // heading 0.007 / timeout 100 are the 3.x defaults already; brakingStrength/brakingStart have no equivalent
+    // (closest: brakeAggression, default 1.0 = no bias).
+    c.parametricTConstraint.set(0.01);
+  });
+
+  public static Localizer createLocalizer(HardwareMap hardwareMap) {
+    return new ThreeWheelLocalizer(hardwareMap, localizerConfig);
+  }
+
+  public static Drivetrain createDrivetrain(HardwareMap hardwareMap) {
+    return new Mecanum(hardwareMap, drivetrainConfig);
+  }
+
+  /** Same name as in 2.x so Robot.java and the simulator keep calling it. Argument order: localizer, drivetrain, algorithm. */
   public static Follower createFollower(HardwareMap hardwareMap) {
-    return new FollowerBuilder(followerConstants, hardwareMap)
-        .pathConstraints(pathConstraints)
-        .threeWheelLocalizer(localizerConstants)
-        .mecanumDrivetrain(driveConstants)
-        .build();
+    return new Follower(createLocalizer(hardwareMap), createDrivetrain(hardwareMap), new Foresight(foresightConfig));
   }
 }
