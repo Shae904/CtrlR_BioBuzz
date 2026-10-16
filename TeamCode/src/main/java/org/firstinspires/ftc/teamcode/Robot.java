@@ -1,7 +1,7 @@
 package org.firstinspires.ftc.teamcode;
 
 import com.pedropathing.follower.Follower;
-import com.pedropathing.math.Vector;
+import com.pedropathing.math.Twist;
 import com.qualcomm.hardware.lynx.LynxModule;
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot.LogoFacingDirection;
@@ -143,11 +143,10 @@ public class Robot {
   public void updateAimingSystem(boolean shouldAim, boolean shouldReset) {
     // AUTOAIM STUFF
     if (shouldAim) {
-      double botHeading = this.follower.getHeading();
-      Vector botVelocity = this.follower.getVelocity();
-      botVelocity.rotateVector(-botHeading);
-      this.limelight.updateAim(((-botVelocity.getYComponent() * 2.54) / 100.0),
-          (botVelocity.getXComponent() * 2.54)
+      // Robot-frame velocity (in/s): vx = forward, vy = left. Same as 2.x getVelocity().rotateVector(-getHeading()).
+      Twist botVelocity = this.follower.twist();
+      this.limelight.updateAim(((-botVelocity.vy * 2.54) / 100.0),
+          (botVelocity.vx * 2.54)
               / 100.0); // Getting velocities in inches / sec and converting to meters / sec
     }
     // Update PID while not auto aiming
