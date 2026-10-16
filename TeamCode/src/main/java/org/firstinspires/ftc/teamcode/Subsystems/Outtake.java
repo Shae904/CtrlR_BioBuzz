@@ -7,6 +7,8 @@ import com.qualcomm.robotcore.hardware.DcMotor.ZeroPowerBehavior;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple.Direction;
 import com.qualcomm.robotcore.hardware.HardwareMap;
+import com.qualcomm.robotcore.hardware.VoltageSensor;
+import com.qualcomm.robotcore.util.ElapsedTime;
 import com.qualcomm.robotcore.util.Range;
 
 @Configurable
@@ -16,12 +18,18 @@ public class Outtake {
 
   // BIOBUZZ presets from the shot model (Limelight.SHOT_*): med ~2.0 m, far ~3.2 m camera -> CELL opening
   // (DECODE values were 1280 / 1640)
-  public static int medSpeed = 1400;
+  public static int medSpeed = 1380;
   public static int farSpeed = 1560;
 
   public static int cycleSpeed = 300;
-  public static double kP = 0.003;
-  public static double kV = 0.0004348;
+
+  // power = (kS + kV * target + kP * error) * NOMINAL_VOLTAGE / battery voltage
+  // kS and kV come from the feedforward sweep in FLYWHEEL PID TESTING (triangle); then tune kP with its step test.
+  public static double kS = 0.0;          // power to overcome friction (12 V units)
+  public static double kV = 0.0004348;    // power per tick/s (12 V units)
+  public static double kP = 0.003;        // power per tick/s of error
+  public static boolean VOLTAGE_COMPENSATION = true; // same flywheel speed on a full or a tired battery
+  public static double NOMINAL_VOLTAGE = 12.0;
 
 
   public static Direction flywheel1MotorDirection = Direction.FORWARD;
@@ -39,6 +47,11 @@ public class Outtake {
 
 
   private double currentVelocity;
+  private double lastPower;
+
+  private final VoltageSensor battery;
+  private final ElapsedTime voltageTimer = new ElapsedTime();
+  private double batteryVoltage = 12.0;
 
   // --- Constructor ---
   public Outtake(LinearOpMode opMode) {
@@ -59,6 +72,25 @@ public class Outtake {
     turret.setZeroPowerBehavior(ZeroPowerBehavior.BRAKE);
     turret.setMode(RunMode.STOP_AND_RESET_ENCODER);
     turret.setMode(RunMode.RUN_WITHOUT_ENCODER);
+
+    battery = hardwareMap.voltageSensor.iterator().next();
+    readBatteryVoltage();
+  }
+
+  private void readBatteryVoltage() {
+    double v = battery.getVoltage();
+    if (v > 7.0) { // ignore a bad read (0 V) instead of dividing by it
+      batteryVoltage = Range.clip(v, 9.0, 15.0);
+    }
+    voltageTimer.reset();
+  }
+
+  /** Battery voltage, re-read at most every 250 ms (a voltage read is a separate, slow hub command). */
+  public double getBatteryVoltage() {
+    if (voltageTimer.milliseconds() > 250) {
+      readBatteryVoltage();
+    }
+    return batteryVoltage;
   }
 
 
@@ -79,12 +111,23 @@ public class Outtake {
     double error = this.targetVelocity - this.currentVelocity;
 
     double output = (kV * this.targetVelocity) + (kP * error);
+    if (this.targetVelocity > 0) {
+      output += kS;
+    }
+    if (VOLTAGE_COMPENSATION) {
+      output *= NOMINAL_VOLTAGE / getBatteryVoltage();
+    }
 
-    // limit power range
+    // limit power range (a little reverse power brakes the flywheel when the target drops)
     output = Range.clip(output, -.2, 1.0);
 
     this.setPower(output);
+    this.lastPower = output;
     return output;
+  }
+
+  public double getLastPower() {
+    return this.lastPower;
   }
 
   public double getCurrentVelocity() {
