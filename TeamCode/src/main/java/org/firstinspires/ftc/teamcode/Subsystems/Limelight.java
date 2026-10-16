@@ -308,18 +308,6 @@ public class Limelight {
   }
 
 
-  public int getPatternIdAuto() { // only for auto just returns the tag id for patterns
-    this.limelight.pipelineSwitch(0);
-    LLResult result = this.limelight.getLatestResult();
-    List<FiducialResult> fiducials = result.getFiducialResults();
-    if (result.isValid()) {
-      for (FiducialResult fiducial : fiducials) {
-        return fiducial.getFiducialId();
-      }
-    }
-    return 21;
-  }
-
   public void setPipeline(AllianceColor color) {
     this.limelight.pipelineSwitch(color.getLLPipelineTeleOP());
   }
