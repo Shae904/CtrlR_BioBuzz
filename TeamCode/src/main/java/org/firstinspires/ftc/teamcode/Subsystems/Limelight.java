@@ -29,23 +29,26 @@ public class Limelight {
   // --- BIOBUZZ AprilTags (manual 9.9 / Figure 9-17): 16 tags, 4 per CELL, on each CELL's underside ---
   //   red scoring 30-33, red audience 34-37, blue audience 38-41, blue scoring 42-45
   // Heights/offsets come from the official field CAD (floor = top of tiles).
-  public static double LENS_HEIGHT_M = 0.427;          // Limelight lens above floor (turret CAD on Worlds Bot)
-  public static double CAM_PITCH_DEG = 35.0;           // Limelight lens axis above horizontal (new tilted mount; was level)
+  public static double LENS_HEIGHT_M = 0.441;          // Limelight lens above floor (ghettoturret v10 CAD, 35 deg mount)
+  public static double CAM_PITCH_DEG = 35.0;           // Limelight lens axis above horizontal (ghettoturret v10 CAD)
   public static double UP_CELL_TAG_HEIGHT_M = 1.261;   // tag cluster height when its CELL faces up (the scoring target)
   public static double DOWN_CELL_TAG_HEIGHT_M = 0.905; // tag cluster height when its CELL faces down
-  public static double OPENING_BEYOND_TAGS_M = 0.152;  // CELL opening centre is this much farther (horizontally) than its tags
+  // CELL opening centre vs its tag cluster, horizontally (field STEP): the opening is at the outer, raised end of the
+  // CELL and faces the same side as the tags, so it is 73 mm NEARER than the tags (negative).
+  public static double OPENING_BEYOND_TAGS_M = -0.073;
 
   // --- Shot formula from the CAD + physics model (vibecadded-ftc/shooter-model/DERIVATION.md) ---
   // ticks/s = d * (SHOT_A * d - SHOT_B)^-0.5 / SHOT_K + SHOT_OFFSET, d = horizontal camera -> CELL opening (m)
-  // Valid ~1.4-3.6 m, 2.85 in POLLEN, ghettoturret hood. Calibrate SHOT_OFFSET with a couple of shots.
-  public static double SHOT_A = 0.160596408922;
-  public static double SHOT_B = 0.148979591837;
-  public static double SHOT_K = 0.0028296709921;
-  public static double SHOT_OFFSET = -315;
+  // Refit 2026-10-16 for ghettoturret v10 (launch 378 mm, 49.8 deg, camera 69 mm behind the launch point), 2.80 in
+  // POLLEN, opening centre 1.509 m. Valid ~1.4-3.6 m. Calibrate SHOT_OFFSET with shots at ~2 m and ~3 m.
+  public static double SHOT_A = 0.229862674941;
+  public static double SHOT_B = 0.216326530612;
+  public static double SHOT_K = 0.0023888583177;
+  public static double SHOT_OFFSET = -308;
   public static double SHOT_MOVE_GAIN = 93 * Math.cos(Math.toRadians(50)); // ticks per m/s toward the goal (DECODE tuning)
   // POLLEN time of flight to the CELL opening: sqrt(2 * (TOF_A * d - TOF_B) / 9.8) seconds
-  public static double TOF_A = 1.400;
-  public static double TOF_B = 1.43;
+  public static double TOF_A = 1.350;
+  public static double TOF_B = 1.38;
 
 
   public final Limelight3A limelight;
@@ -187,7 +190,7 @@ public class Limelight {
     this.hiveTagCount = count[best];
     this.tagDistance = sumDist[best] / count[best];
     this.aimTx = sumTx[best] / count[best];
-    // Tags are only visible from the side the opening faces away from, so the opening is beyond them
+    // The opening faces the same side as the tags and sits 73 mm nearer (OPENING_BEYOND_TAGS_M < 0)
     this.distance = this.tagDistance + OPENING_BEYOND_TAGS_M;
   }
 
