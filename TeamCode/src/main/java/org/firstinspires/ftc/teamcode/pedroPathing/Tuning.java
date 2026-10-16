@@ -12,24 +12,27 @@ import org.firstinspires.ftc.teamcode.pedroPathing.procedures.ThreeWheelTuner;
  * Pedro 3 AutoTune entry points. Sloth's TunerScanner (com.pedropathing:tuning) finds every static, zero-argument
  * method annotated @Tuner that returns Procedure, and lists it at http://192.168.43.1:10158 (no @TeleOp needed:
  * each step runs as a temporary "Pedro Tuning" utility opmode).
+ *
+ * Each @Tuner names itself: tuning 1.0.3-beta.1's scanner registers annotation.name() as-is (it no longer falls back
+ * to the procedure's own name), so an unnamed @Tuner would show up blank on the tuning page.
  */
 public class Tuning {
-  @Tuner
+  @Tuner(name = "Mecanum Tuner")
   public static Procedure mecanumTuner() {
     return new MecanumTuner();
   }
 
-  @Tuner
+  @Tuner(name = "Three Wheel Tuner")
   public static Procedure threeWheelTuner() {
     return new ThreeWheelTuner();
   }
 
-  @Tuner
+  @Tuner(name = "Foresight Tuner")
   public static Procedure foresightTuner() {
     return new ForesightTuner(Constants::createLocalizer, Constants::createDrivetrain);
   }
 
-  @Tuner
+  @Tuner(name = "Tests")
   public static Procedure tests() {
     return new Tests(Constants::createDrivetrain, Constants::createLocalizer, () -> new Foresight(Constants.foresightConfig));
   }
