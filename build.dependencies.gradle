@@ -18,9 +18,9 @@ dependencies {
 
     // Pedro Pathing 3 (Foresight follower + AutoTune). revhub brings core; tuning needs Sloth from the Dairy repo.
     implementation 'com.pedropathing:revhub:3.0.2'
-    // tuning 1.0.1 (what the Pedro 3 quickstart pins): 1.0.2's TunerScanner crashes Sloth at robot start
-    // (putIfAbsent(...).add -> NullPointerException at TunerScanner.java:59 on the first @Tuner method).
-    implementation 'com.pedropathing:tuning:1.0.1'
+    // tuning 1.0.3-beta.1: 1.0.2's TunerScanner crashed Sloth at robot start (putIfAbsent(...).add -> NullPointerException
+    // at TunerScanner.java:59); the beta fixes it (computeIfAbsent).
+    implementation 'com.pedropathing:tuning:1.0.3-beta.1'
     // Panels: 1.0.15+ is required on SDK 12 (older versions break @Configurable).
     implementation 'com.bylazar:fullpanels:1.0.18'
 }
