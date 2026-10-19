@@ -52,8 +52,8 @@ public abstract class BaseHiveAuto {
   /** Field interior (in): BLUE poses are RED's rotated about (FIELD_IN / 2, FIELD_IN / 2). */
   public static double FIELD_IN = 141.05;
 
-  /** Flywheel target while driving (ticks/s), until the Limelight gives the formula's. */
-  public static double SPINUP_TICKS = 1500;
+  /** Flywheel target while driving (ticks/s), until the Limelight gives the formula's (~1140 at the shooting spots). */
+  public static double SPINUP_TICKS = 1150;
   /**
    * Ready to shoot: turret within this of the tags' aim point (deg) and the flywheel within this of its target, held
    * for READY_HOLD_MS, so a turret swinging through the aim point is not ready. The CELL opening is ~20 in wide and 2

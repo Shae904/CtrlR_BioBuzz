@@ -39,16 +39,21 @@ public class Limelight {
 
   // --- Shot formula from the CAD + physics model (vibecadded-ftc/shooter-model/DERIVATION.md) ---
   // ticks/s = d * (SHOT_A * d - SHOT_B)^-0.5 / SHOT_K + SHOT_OFFSET, d = horizontal camera -> CELL opening (m)
-  // Refit 2026-10-16 for ghettoturret v10 (launch 378 mm, 49.8 deg, camera 69 mm behind the launch point), 2.80 in
-  // POLLEN, opening centre 1.509 m. Valid ~1.4-3.6 m. Calibrate SHOT_OFFSET with shots at ~2 m and ~3 m.
-  public static double SHOT_A = 0.229862674941;
-  public static double SHOT_B = 0.216326530612;
-  public static double SHOT_K = 0.0023888583177;
-  public static double SHOT_OFFSET = -308;
+  // Calibrated 2026-10-19 on the robot: 1140 ticks/s scores from the auto corner (camera -> opening 1.54 m), where
+  // the 10-16 fit asked for 1429. The 10-16 fit carried over the DECODE robot's 14% slip loss (eta 0.859) and a small
+  // spring-back (49.8 deg); 1140 is only possible with no slip loss (at 0.859 the ball can't reach the opening at any
+  // launch angle). Model now: no slip loss (eta 1.01, the ball leaves at ~50% of the tire speed), launch 52.6 deg (the
+  // 48 deg hood + 4.6 deg spring-back, as measured on DECODE), launch point 378 mm, 2.80 in POLLEN, opening centre
+  // 1.509 m. Valid ~1.4-3.6 m: 1.54 m -> 1140, 2.0 m -> 1146, 2.5 m -> 1205, 3.0 m -> 1280. Still to confirm with a
+  // shot from ~3 m (if that one lands high, the launch is flatter: refit with the measured speed).
+  public static double SHOT_A = 0.280894269484;
+  public static double SHOT_B = 0.240816326531;
+  public static double SHOT_K = 0.0025098411518;
+  public static double SHOT_OFFSET = -261;
   public static double SHOT_MOVE_GAIN = 93 * Math.cos(Math.toRadians(50)); // ticks per m/s toward the goal (DECODE tuning)
-  // POLLEN time of flight to the CELL opening: sqrt(2 * (TOF_A * d - TOF_B) / 9.8) seconds
-  public static double TOF_A = 1.350;
-  public static double TOF_B = 1.38;
+  // POLLEN time of flight to the CELL opening: sqrt(2 * (TOF_A * d - TOF_B) / 9.8) seconds (same model, 2026-10-19)
+  public static double TOF_A = 1.505;
+  public static double TOF_B = 1.44;
 
 
   public final Limelight3A limelight;
