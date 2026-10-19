@@ -1,5 +1,7 @@
 package org.firstinspires.ftc.teamcode;
 
+import com.bylazar.telemetry.JoinedTelemetry;
+import com.bylazar.telemetry.PanelsTelemetry;
 import com.pedropathing.follower.Follower;
 import com.pedropathing.math.Twist;
 import com.qualcomm.hardware.lynx.LynxModule;
@@ -63,6 +65,9 @@ public class Robot {
 
     // TODO: what is this
     opMode.telemetry.setMsTransmissionInterval(11);
+    // Send this opmode's telemetry to Panels too: Panels' Graph only plots "name: number" lines that reach Panels
+    // telemetry, and the plain Driver Station telemetry (Vel Current, Vel Target, ...) never does.
+    opMode.telemetry = new JoinedTelemetry(PanelsTelemetry.INSTANCE.getFtcTelemetry(), opMode.telemetry);
 
     bl = hardwareMap.dcMotor.get("bl");
     br = hardwareMap.dcMotor.get("br");
