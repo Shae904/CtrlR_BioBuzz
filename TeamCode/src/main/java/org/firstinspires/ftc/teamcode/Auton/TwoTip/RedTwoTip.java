@@ -1,4 +1,4 @@
-package org.firstinspires.ftc.teamcode.Auton;
+package org.firstinspires.ftc.teamcode.Auton.TwoTip;
 
 import com.bylazar.configurables.annotations.Configurable;
 import com.pedropathing.math.Pose;

@@ -1,4 +1,4 @@
-package org.firstinspires.ftc.teamcode.Auton;
+package org.firstinspires.ftc.teamcode.Auton.Hive4;
 
 import com.bylazar.configurables.annotations.Configurable;
 import com.pedropathing.math.Pose;
@@ -8,18 +8,18 @@ import org.firstinspires.ftc.teamcode.AllianceColor;
 import org.firstinspires.ftc.teamcode.Robot;
 
 @Configurable
-@Autonomous(name = "BLUE HIVE 4", group = "MAIN")
-public class BlueHive4 extends LinearOpMode {
+@Autonomous(name = "RED HIVE 4", group = "MAIN")
+public class RedHive4 extends LinearOpMode {
 
   /**
-   * x in, y in, heading deg: the RED start rotated 180 deg about the field centre: back against the rear wall, robot
-   * centre 46 in from the blue wall (tile column E), facing the audience.
+   * x in, y in, heading deg (Pedro field frame: origin at the red/audience corner): back against the audience wall,
+   * robot centre 46 in from the red wall (tile column B), facing the far wall (G304).
    */
-  public static double[] START = {95.05, 133.69, 270};
+  public static double[] START = {46.0, 7.36, 90};
 
   @Override
   public void runOpMode() throws InterruptedException {
-    Robot robot = new Robot(this, AllianceColor.BLUE);
+    Robot robot = new Robot(this, AllianceColor.RED);
     robot.follower.setPose(new Pose(START[0], START[1], Math.toRadians(START[2])));
     new BaseHive4(this, robot).run();
   }
