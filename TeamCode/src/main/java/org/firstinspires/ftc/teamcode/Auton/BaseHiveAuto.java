@@ -40,11 +40,9 @@ import org.firstinspires.ftc.teamcode.Subsystems.Intake;
  * a 'flapper' servo in the robot configuration the autos still run (INIT says so): HIVE 4 fires the whole hopper at
  * once and does not need the gate, but 2 TIP does (without it, balls it collects would go straight to the flywheel).
  *
- * <p>Bulk reads: MANUAL with the cache cleared at the top of every loop, like BaseTeleop. Robot sets AUTO, and in AUTO
- * Pedro's left odometry pod is read from the previous loop's bulk data (its Encoder.reset() reads each pod twice, so
- * the right pod always triggers the refresh): the stale pod tilts the heading while driving, and over the 2 TIP
- * route that put the robot 4-5 in off where Pedro thought it was (in the simulator, which reproduces the SDK's bulk
- * caching).
+ * <p>Bulk reads: MANUAL with the cache cleared at the top of every loop, like BaseTeleop. (With the old three-wheel
+ * localizer, Robot's AUTO mode read one pod a loop late and put the robot 4-5 in off over the 2 TIP route; the
+ * Pinpoint reports its pose over I2C, outside the bulk read, but MANUAL still keeps the motor reads consistent.)
  */
 @Configurable
 public abstract class BaseHiveAuto {

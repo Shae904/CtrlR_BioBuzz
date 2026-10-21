@@ -10,16 +10,18 @@ import com.pedropathing.math.Matrix;
 import com.pedropathing.math.Vector2D;
 import com.pedropathing.revhub.drivetrains.Mecanum;
 import com.pedropathing.revhub.drivetrains.MecanumConfig;
-import com.pedropathing.revhub.localizers.Encoder;
-import com.pedropathing.revhub.localizers.ThreeWheelConfig;
-import com.pedropathing.revhub.localizers.ThreeWheelLocalizer;
+import com.pedropathing.revhub.localizers.PinpointConfig;
+import com.pedropathing.revhub.localizers.PinpointLocalizer;
+import com.qualcomm.hardware.gobilda.GoBildaPinpointDriver;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.HardwareMap;
+import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 
 /**
  * Pedro Pathing 3.0.2 constants for the BIOBUZZ robot (migrated from the 2.0.6 FollowerConstants / MecanumConstants /
- * ThreeWheelConstants / PathConstraints). Values marked "2.x" are carried over unchanged; values marked "ESTIMATE" have
- * no 2.x equivalent and must be replaced by the AutoTune Foresight Tuner's generated block before any path is run.
+ * PathConstraints; the three-wheel localizer was replaced by a goBILDA Pinpoint with two pods). Values marked "2.x" are
+ * carried over unchanged; values marked "ESTIMATE" have no 2.x equivalent and must be replaced by the AutoTune
+ * Foresight Tuner's generated block before any path is run.
  */
 public class Constants {
 
@@ -41,20 +43,23 @@ public class Constants {
     // 2.x xVelocity / yVelocity: moved to foresightConfig.maxAchievable{Forward,Strafe}Velocity below.
   });
 
-  // ---- Localizer (2.x ThreeWheelConstants) ------------------------------------------------------------------------
-  public static ThreeWheelConfig localizerConfig = new ThreeWheelConfig(c -> {
-    c.leftEncoderName.set("fl");                    // 2.x leftEncoder_HardwareMapName
-    c.rightEncoderName.set("fr");                   // 2.x rightEncoder_HardwareMapName
-    c.strafeEncoderName.set("flywheel2");           // 2.x strafeEncoder_HardwareMapName
-    c.leftPodY.set(7.5);                            // 2.x leftPodY
-    c.rightPodY.set(-7.5);                          // 2.x rightPodY
-    c.strafePodX.set(-2.0);                         // 2.x strafePodX(-2): must be a double literal (ConfigVar<Double>)
-    c.forwardTicksToInches.set(0.001989436789);     // 2.x forwardTicksToInches
-    c.strafeTicksToInches.set(0.001989436789);      // 2.x strafeTicksToInches
-    c.turnTicksToRadians.set(0.001989436789);       // 2.x turnTicksToInches: renamed, identical formula
-    c.leftEncoderDirection.set(Encoder.REVERSE);    // 2.x Encoder.REVERSE (-1.0)
-    c.rightEncoderDirection.set(Encoder.REVERSE);
-    c.strafeEncoderDirection.set(Encoder.REVERSE);
+  // ---- Localizer: goBILDA Pinpoint with two pods (the left parallel pod and the strafe pod) -------------------------
+  // The Pinpoint integrates the two pods with its own IMU and reports a pose over I2C ("pinpoint" in the robot
+  // configuration, on an I2C port of the Control Hub). Offsets are where each pod's wheel sits relative to the robot's
+  // centre of rotation: xPodOffset = the forward (X) pod's sideways position (left positive), yPodOffset = the strafe
+  // (Y) pod's forward position (forward positive). Starting values from the CAD / the old ThreeWheel constants (left
+  // pod 7.5 in left of centre, strafe pod 2 in behind it); directions assume both pods count forward / left.
+  // Tune all four with AutoTune's "Pinpoint Tuner" (pedroPathing/procedures/PinpointTuner): push forward, push left,
+  // spin 180 deg CCW, then paste its block here.
+  public static PinpointConfig localizerConfig = new PinpointConfig(c -> {
+    c.name.set("pinpoint");
+    c.podType.set(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_4_BAR_POD);   // 32 mm wheel, 2000 CPR
+    c.xPodOffset.set(7.5);
+    c.yPodOffset.set(-2.0);
+    c.xPodDirection.set(GoBildaPinpointDriver.EncoderDirection.FORWARD);
+    c.yPodDirection.set(GoBildaPinpointDriver.EncoderDirection.FORWARD);
+    c.globalDistanceUnit.set(DistanceUnit.INCH);
+    c.offsetUnits.set(DistanceUnit.INCH);
   });
 
   // ---- Algorithm (2.x FollowerConstants + PathConstraints) --------------------------------------------------------
@@ -89,7 +94,7 @@ public class Constants {
   });
 
   public static Localizer createLocalizer(HardwareMap hardwareMap) {
-    return new ThreeWheelLocalizer(hardwareMap, localizerConfig);
+    return new PinpointLocalizer(hardwareMap, localizerConfig);
   }
 
   public static Drivetrain createDrivetrain(HardwareMap hardwareMap) {
