@@ -5,8 +5,8 @@ import com.pedropathing.tuning.autotune.Procedure;
 import com.pedropathing.tuning.autotune.Tuner;
 import org.firstinspires.ftc.teamcode.pedroPathing.procedures.ForesightTuner;
 import org.firstinspires.ftc.teamcode.pedroPathing.procedures.MecanumTuner;
+import org.firstinspires.ftc.teamcode.pedroPathing.procedures.PinpointTuner;
 import org.firstinspires.ftc.teamcode.pedroPathing.procedures.Tests;
-import org.firstinspires.ftc.teamcode.pedroPathing.procedures.ThreeWheelTuner;
 
 /**
  * Pedro 3 AutoTune entry points. Sloth's TunerScanner (com.pedropathing:tuning) finds every static, zero-argument
@@ -22,9 +22,9 @@ public class Tuning {
     return new MecanumTuner();
   }
 
-  @Tuner(name = "Three Wheel Tuner")
-  public static Procedure threeWheelTuner() {
-    return new ThreeWheelTuner();
+  @Tuner(name = "Pinpoint Tuner")
+  public static Procedure pinpointTuner() {
+    return new PinpointTuner();
   }
 
   @Tuner(name = "Foresight Tuner")
