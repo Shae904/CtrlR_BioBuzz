@@ -39,7 +39,6 @@ public class BaseTeleop {
     this.robot.setTiltFolded();
     while (opMode.opModeIsActive()) {
       this.robot.clearBulkCache();
-      this.robot.intake.updateAutoCycle();
       this.robot.follower.update();
 
       // DRIVETRAIN

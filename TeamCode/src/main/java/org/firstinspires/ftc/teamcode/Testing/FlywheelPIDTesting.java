@@ -9,7 +9,6 @@ import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.util.ElapsedTime;
 import java.util.List;
 import org.firstinspires.ftc.teamcode.Subsystems.Intake;
-import org.firstinspires.ftc.teamcode.Subsystems.Intake.FlapperState;
 import org.firstinspires.ftc.teamcode.Subsystems.Outtake;
 
 /**
@@ -89,7 +88,7 @@ public class FlywheelPIDTesting extends LinearOpMode {
     telemetry.addLine("TRIANGLE sweep (kS/kV) | SQUARE step test (kP) | CIRCLE hold + feed | CROSS stop");
     telemetry.update();
     waitForStart();
-    intake.setCyclePosition(FlapperState.SHOOT);
+    intake.setFlapper(true);   // gate open: the right trigger feeds the hopper into the flywheel
 
     ElapsedTime loop = new ElapsedTime();
     while (opModeIsActive()) {
