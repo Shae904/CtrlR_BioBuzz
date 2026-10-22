@@ -18,7 +18,6 @@ import com.qualcomm.robotcore.hardware.IMU;
 import com.qualcomm.robotcore.hardware.ServoImplEx;
 import java.util.List;
 import org.firstinspires.ftc.teamcode.Subsystems.Intake;
-import org.firstinspires.ftc.teamcode.Subsystems.Intake.FlapperState;
 import org.firstinspires.ftc.teamcode.Subsystems.Limelight;
 import org.firstinspires.ftc.teamcode.Subsystems.Outtake;
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
@@ -108,7 +107,7 @@ public class Robot {
   }
 
   public void initAuton() {
-    this.intake.setCyclePosition(FlapperState.LOCKED);
+    this.intake.setFlapper(false);
     this.setTiltFolded();
   }
 

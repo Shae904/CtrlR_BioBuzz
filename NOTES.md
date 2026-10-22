@@ -40,7 +40,7 @@ inches, origin at the red/audience corner, x toward blue, y toward the rear wall
 
 **Odometry** (changed 2026-10-21, PR #14)
 - goBILDA **Pinpoint** with **two** pods: the **left** parallel pod on the Pinpoint's **X** port, the **strafe** pod on **Y**. The right pod is no longer read. Pods: goBILDA 4-bar, 32 mm wheel, 2000 CPR.
-- Pod positions (old 3-wheel constants, from CAD): left pod 7.5 in left of centre, strafe pod 2 in behind centre. In Pinpoint terms: `xPodOffset = 7.5` (X pod's sideways offset, left +), `yPodOffset = −2.0` (Y pod's forward offset). Directions both FORWARD until tuned. **Not yet tuned on the robot**: run the Pinpoint Tuner (§5) and paste its block into `Constants.localizerConfig`.
+- **Tuned on the robot 2026-10-22** (CommanderSleepy, Pinpoint Tuner): `xPodOffset 7.48184`, `yPodOffset 2.46908`, both pod directions REVERSED. The X offset matches the CAD's 7.5 in. The Y offset came out +2.47 where the CAD puts the strafe pod 2 in *behind* centre (−2.0): either the pod moved or the tuner's spin step read the sign the other way; a quick check is the Pose Test while spinning the robot 360° by hand: sideways drift > 1 in means the Y offset sign is wrong.
 - Device name in the robot configuration must be exactly `pinpoint`, on a Control Hub I2C port (1–3; port 0 is the built-in IMU's). As of 10-22 the Pinpoint is confirmed connected and reporting data over ADB.
 
 **Turret** `ghettoturret:1`
@@ -60,7 +60,7 @@ inches, origin at the red/audience corner, x toward blue, y toward the rear wall
 
 **Intake / hopper**
 - Front roller of 9 compliant wheels (Ø48), axis 217 mm ahead of centre, 90 mm above the floor, 306 mm wide. Only POLLEN (2.8 in) fits the 80 mm channel; NECTAR (3.6 in) does not. Hopper holds 4 (the preload count). Motor `intake` REVERSE, `POWER_INTAKE = 1`.
-- Gate: the code's `Intake` has the DECODE "flapper" gate **commented out** (`// gate = hardwareMap.get(ServoImplEx.class, "flapper")`). A toggle gate is planned. The autos drive a servo named `flapper` directly if it exists (`FLAPPER_SHOOT 0.1` open, `FLAPPER_LOCKED 0.35` shut) and warn at INIT if it doesn't. `cycler` servo is still in the code (CYCLER_LOCKED 0.63).
+- Gate ("slapper", added to the robot 2026-10-22): servo `flapper`, driven by `Intake.setFlapper(boolean up)`. **Starts DOWN** (shut: the hopper holds balls while intaking) at construction and at INIT; **UP** (open: balls feed into the flywheel) only while triangle is held in teleop, or while an auto shoots. Positions `Intake.FLAPPER_UP 0.1` / `FLAPPER_DOWN 0.35` are still DECODE's numbers: if the slapper moves the wrong way, swap them (Panels-live, then copy into the code). `cycler` is DECODE's servo, now optional (`tryGet`): the code runs without it in the configuration.
 - Other servos: `tiltA`/`tiltB` (folded .98/.08, deployed .49/.55), `rgb` (indicator: .5 locked on, .277 not aimed, .611 no target).
 
 **Hardware map names** (all of them): `fl fr bl br flywheel1 flywheel2 turret intake` (motors), `cycler flapper tiltA tiltB rgb` (servos), `imu`, `limelight`, `pinpoint`.
@@ -96,15 +96,15 @@ Aim: `AllianceColor.getAimPose()` is the tx (deg) the turret centres the tags at
 - **After the localizer change, re-run the Foresight Tuner**: its numbers were measured through the old localizer.
 - Autos run **MANUAL bulk caching** with `clearBulkCache()` each loop (like BaseTeleop). `Robot` sets AUTO; with the old 3-wheel localizer that read one pod a loop late and drifted 4–5 in over the 2 TIP route in the sim.
 
-### Open problem (2026-10-22): AutoTune "tuner disconnected"
-Symptoms: page loads, `/api/tuners` lists the four tuners, ports 10158/12649/5555 all reachable, but every tuner's websocket drops ~1 s after clicking, including right after a power cycle. Earlier the log said the Pinpoint wasn't found at the configured slot; the Pinpoint is now confirmed reading over ADB, and all tuners still fail. Mechanism (from the tuning jar's bytecode): the page sends `init`, the server creates the procedure (`TuningSession.beginProcedure`) and, if that throws, closes the socket with the exception's message; the exception also goes to logcat via `printStackTrace` (thread `Pedro-Tuning`, log tag `WebSocketServer`). Leading suspect: **`tuning:1.0.3-beta.1`**. It's not the one-line scanner fix I thought it was; it reworks tuner registration per class loader (`proceduresByLoader`, `beforeUnload`), and the Pinpoint tuner/quickstart are written against **`tuning:1.0.1`** (quickstart: revhub 3.0.1 + tuning 1.0.1). Proposed fix: pin `com.pedropathing:tuning:1.0.1` in `build.dependencies.gradle` (1.0.1 doesn't have 1.0.2's scanner NPE; that was why we moved off 1.0.2 in the first place). Not applied yet. The browser console line `Tuning WebSocket closed {code, reason}` after a click, or `adb logcat | grep -iE "Pedro-Tuning|WebSocketServer|TunerScanner"`, will name the actual exception.
+### AutoTune "tuner disconnected" (2026-10-22, resolved)
+Every tuner's websocket dropped ~1 s after clicking. The mechanism: the page sends `init`, the server creates the procedure and, if anything in it throws, closes the socket with the exception's message (also in logcat, thread `Pedro-Tuning`, tag `WebSocketServer`). The throw was the `pinpoint` device missing from the active robot configuration; once it was configured (Control Hub I2C port, type "goBILDA Pinpoint Odometry Computer", name `pinpoint`) the Pinpoint and Foresight tuners ran and produced the blocks now in `Constants`. If it ever comes back: read that console line / logcat first, it names the exception.
 
 ## 6. Autonomous (in `Auton/`, written in the sim, 48 and 20 points there)
 
 - `BaseHiveAuto`: shared toolkit. Alliance poses (`fieldPose`), `drive(path, timeout)` + `driveTo` (a short settle path if Pedro stopped >1 in off), Limelight aim with a per-spot aim point (`setAimPoint`), the turret resting toward where the cell will be while driving (tracking a cell behind the robot by odometry ran it into its ±180° limit), `aimUntilReady` (2° and flywheel within 30 ticks/s, held 80 ms), `shoot(n)` one ball per intake pulse, `shootVolley()`, `stopAiming()` before parking. All `@Configurable`.
 - **HIVE 4** (`Hive4/`): start RED (46, 7.36, 90°) / BLUE (95.05, 133.69, 270°) against the audience/rear wall; out to (46, 22), shooting spot (16.5, 16.5) 1.43 m from the up cell, 47° off its axis; volley of 4. The 3rd pollen tips (3 nectar already in the cell), the 4th spills. 20 + LEAVE.
 - **2 TIP** (`TwoTip/`): same start; shoot 3 → tip; sweep the garden along the audience wall pressed on it (turn at (28, 15), slide to (25, 8.4), sweep to (12.3, 7.0) at 25 in/s) for 3 pollen; curve via (26, 40), (26, 95) to (15.5, 125.9) behind the hive, aim point −1°, shoot 4 into the cell that came up; rear flower (47.5, 117) → (47.5, 126.2) facing it, intake 1 s for its 4 pollen; back to (15.5, 125.9), shoot 4 → second tip (needs 8); park at (17, 106, 90°). 48 points in the sim, both alliances, lockstep and real time.
-- Spin-up target while driving `SPINUP_TICKS = 1150`.
+- Spin-up target while driving `SPINUP_TICKS = 1150`. The autos open/close the gate through `Intake.setFlapper`.
 - **None of this has run on the real robot yet.** Things to expect to tune: aim points, feed timing (`FEED_FIRST_MS 150`, `FEED_INTERVAL_MS 233`, `FEED_MARGIN_MS 110`), whether the real intake grabs pollen pressed against the wall and out of the flower, Pedro's following accuracy (then the settle thresholds).
 - Shooting geometry limits (from the sim): from closer than ~1.2 m the ball can't climb to the opening (needs ≥0.96 m horizontal at any speed); comfortable 1.3–1.45 m; the speed formula has a singularity below ~1.3 m (`SHOT_A·d − SHOT_B` → 0). From the spilled-pollen pile right under the hive you cannot score: back off to ~1.4 m first.
 
@@ -116,7 +116,7 @@ Field-centric drive on gamepad1 left stick, turn right stick (either pad). Left 
 
 - Panels `@Configurable` edits don't survive a restart; copy tuned values into the code.
 - SDK merges overwrite `build.dependencies.gradle`: re-add the bylazar + dairy repos, revhub, tuning and fullpanels after any SDK update. Panels must be ≥1.0.15 on SDK 12. Sloth 0.3.2 comes from the Dairy repo and is required (Panels configurables/opmodecontrol and Pedro tuning need it).
-- `tuning:1.0.2` crashes Sloth at robot start (TunerScanner NPE); `1.0.3-beta.1` has the open websocket problem above; `1.0.1` is what the quickstart uses.
+- `tuning:1.0.2` crashes Sloth at robot start (TunerScanner NPE); `1.0.3-beta.1` is what we run (the 10-22 "disconnected" scare turned out to be the Pinpoint missing from the robot configuration, not the library; the tuners worked once it was configured).
 - Pedro 3 `ConfigVar<Double>` must be set with a double literal (`-2.0`, not `-2`).
 - The Limelight web UI "ignores NetworkTables index" while you have a pipeline selected there: click the button or the code can't switch pipelines.
 - Logger Pro angle: the camera must be perpendicular to the shot plane or the angle reads steep.
@@ -137,6 +137,8 @@ Ryan Lim (github `inevident`, commits as `inevident <ryanlimpre@gmail.com>`), te
 
 ## Log (newest first; add a line when you change the robot)
 
+- 2026-10-22: Flapper logic reworked (PR #15): `Intake.setFlapper(up)`, starts DOWN at construction and INIT, UP only while triangle is held, autos use it; `cycler` optional. Positions still DECODE's 0.1 / 0.35, to be checked on the slapper. (Claude/Ryan)
+- 2026-10-22: CommanderSleepy: Pinpoint tuned (REVERSED/REVERSED, 7.48 / +2.47 in), Foresight re-tuned (full block), flapper servo re-enabled in Intake with hold-to-SHOOT in teleop. Not logged here at the time; recorded by Claude on review.
 - 2026-10-22: AutoTune websocket drops ~1 s after any tuner starts (all four). Pinpoint confirmed connected and reading via ADB. Suspect tuning 1.0.3-beta.1; propose pinning tuning 1.0.1. Not yet changed. (Claude/Ryan)
 - 2026-10-21: PR #14 Pinpoint odometry (left + strafe pods), Pedro PinpointLocalizer + quickstart PinpointTuner; ThreeWheelTuner removed. Logger Pro measured the launch angle ≈58°; 58° refit computed but not applied. (Claude/Ryan)
 - 2026-10-19: PR #13 shot formula recalibrated to 1140 ticks/s from the auto corner (no slip loss, 52.6°). PR #12 telemetry to Panels. PR #11 HIVE 4 + 2 TIP autos (from the sim); shaizebos moved them into subpackages. Limelight pipelines set up for BIOBUZZ tags. Flywheel kS/kV/kP tuned in Panels. (Claude/Ryan/shaizebos)

@@ -7,7 +7,6 @@ import com.pedropathing.math.Twist;
 import com.pedropathing.paths.Path;
 import com.qualcomm.hardware.lynx.LynxModule.BulkCachingMode;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
-import com.qualcomm.robotcore.hardware.ServoImplEx;
 import com.qualcomm.robotcore.util.ElapsedTime;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.teamcode.AllianceColor;
@@ -33,12 +32,8 @@ import org.firstinspires.ftc.teamcode.Subsystems.Intake;
  * arrives, and the turret never chases a CELL behind the robot across its +-180 deg limit (on the 2 TIP route that
  * unwinding left it swinging +-20 deg when the shots went).
  *
- * <p>The gate: Intake's flapper servo is still commented out, so this class drives the 'flapper' servo itself
- * ({@link Intake#FLAPPER_SHOOT} / {@link Intake#FLAPPER_LOCKED}). Once Intake has the gate back, {@link #openGate()} /
- * {@link #closeGate()} can call {@code robot.intake.setCyclePosition(FlapperState.SHOOT / LOCKED)} instead. With the
- * gate shut the intake collects into the hopper; with it open the intake feeds the hopper into the flywheel. Without
- * a 'flapper' servo in the robot configuration the autos still run (INIT says so): HIVE 4 fires the whole hopper at
- * once and does not need the gate, but 2 TIP does (without it, balls it collects would go straight to the flywheel).
+ * <p>The gate is the flapper ({@link Intake#setFlapper}): down (shut) the intake collects into the hopper, up (open)
+ * the intake feeds the hopper into the flywheel.
  *
  * <p>Bulk reads: MANUAL with the cache cleared at the top of every loop, like BaseTeleop. (With the old three-wheel
  * localizer, Robot's AUTO mode read one pod a loop late and put the robot 4-5 in off over the 2 TIP route; the
@@ -82,8 +77,6 @@ public abstract class BaseHiveAuto {
   protected final LinearOpMode opMode;
   protected final Robot robot;
   protected final Telemetry telemetry;
-  /** The 'flapper' gate servo, or null when the robot configuration has none. */
-  private final ServoImplEx gate;
   protected String phase = "INIT";
   private double aimTxDeg;
   private boolean aiming = true;
@@ -94,7 +87,6 @@ public abstract class BaseHiveAuto {
     this.opMode = opMode;
     this.robot = robot;
     this.telemetry = opMode.telemetry;
-    this.gate = opMode.hardwareMap.tryGet(ServoImplEx.class, "flapper");
   }
 
   public abstract void run();
@@ -108,9 +100,6 @@ public abstract class BaseHiveAuto {
       robot.clearBulkCache();
       telemetry.addData("AUTO", description);
       telemetry.addData("start", robot.follower.pose());
-      if (gate == null) {
-        telemetry.addLine("WARNING: no 'flapper' servo in the configuration: no gate (2 TIP needs it)");
-      }
       telemetry.update();
     }
     return opMode.opModeIsActive();
@@ -299,15 +288,11 @@ public abstract class BaseHiveAuto {
   }
 
   protected void openGate() {
-    if (gate != null) {
-      gate.setPosition(Intake.FLAPPER_SHOOT);
-    }
+    robot.intake.setFlapper(true);
   }
 
   protected void closeGate() {
-    if (gate != null) {
-      gate.setPosition(Intake.FLAPPER_LOCKED);
-    }
+    robot.intake.setFlapper(false);
   }
 
   /** Holds the last pose until AUTO ends. */
