@@ -60,10 +60,10 @@ inches, origin at the red/audience corner, x toward blue, y toward the rear wall
 
 **Intake / hopper**
 - Front roller of 9 compliant wheels (Ø48), axis 217 mm ahead of centre, 90 mm above the floor, 306 mm wide. Only POLLEN (2.8 in) fits the 80 mm channel; NECTAR (3.6 in) does not. Hopper holds 4 (the preload count). Motor `intake` REVERSE, `POWER_INTAKE = 1`.
-- Gate ("slapper", added to the robot 2026-10-22): servo `flapper`, driven by `Intake.setFlapper(boolean up)`. **Starts DOWN** (shut: the hopper holds balls while intaking) at construction and at INIT; **UP** (open: balls feed into the flywheel) only while triangle is held in teleop, or while an auto shoots. Positions `Intake.FLAPPER_UP 0.1` / `FLAPPER_DOWN 0.35` are still DECODE's numbers: if the slapper moves the wrong way, swap them (Panels-live, then copy into the code). `cycler` is DECODE's servo, now optional (`tryGet`): the code runs without it in the configuration.
+- Gate ("slapper", added to the robot 2026-10-22): servo `flapper`, driven by `Intake.setFlapper(boolean up)`. **Starts DOWN** (shut: the hopper holds balls while intaking) at construction and at INIT; **UP** (open: balls feed into the flywheel) only while triangle is held in teleop, or while an auto shoots. Positions `Intake.FLAPPER_UP 0.1` / `FLAPPER_DOWN 0.35` are still DECODE's numbers: if the slapper moves the wrong way, swap them (Panels-live, then copy into the code). The DECODE `cycler` servo and its cycle state machine are gone (PR #16); `Intake` is just the roller motor + the flapper.
 - Other servos: `tiltA`/`tiltB` (folded .98/.08, deployed .49/.55), `rgb` (indicator: .5 locked on, .277 not aimed, .611 no target).
 
-**Hardware map names** (all of them): `fl fr bl br flywheel1 flywheel2 turret intake` (motors), `cycler flapper tiltA tiltB rgb` (servos), `imu`, `limelight`, `pinpoint`.
+**Hardware map names** (all of them): `fl fr bl br flywheel1 flywheel2 turret intake` (motors), `flapper tiltA tiltB rgb` (servos), `imu`, `limelight`, `pinpoint`.
 
 ## 3. The field (what the code and autos assume)
 
@@ -137,6 +137,7 @@ Ryan Lim (github `inevident`, commits as `inevident <ryanlimpre@gmail.com>`), te
 
 ## Log (newest first; add a line when you change the robot)
 
+- 2026-10-22: PR #16 removed the DECODE cycler servo and the cycle state machine (`updateAutoCycle`, `FlapperState`, `CYCLER_LOCKED`); `Intake` = roller + flapper. (Claude/Ryan)
 - 2026-10-22: Flapper logic reworked (PR #15): `Intake.setFlapper(up)`, starts DOWN at construction and INIT, UP only while triangle is held, autos use it; `cycler` optional. Positions still DECODE's 0.1 / 0.35, to be checked on the slapper. (Claude/Ryan)
 - 2026-10-22: CommanderSleepy: Pinpoint tuned (REVERSED/REVERSED, 7.48 / +2.47 in), Foresight re-tuned (full block), flapper servo re-enabled in Intake with hold-to-SHOOT in teleop. Not logged here at the time; recorded by Claude on review.
 - 2026-10-22: AutoTune websocket drops ~1 s after any tuner starts (all four). Pinpoint confirmed connected and reading via ADB. Suspect tuning 1.0.3-beta.1; propose pinning tuning 1.0.1. Not yet changed. (Claude/Ryan)
