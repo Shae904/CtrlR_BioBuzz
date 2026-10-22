@@ -160,7 +160,6 @@ public abstract class BaseHiveAuto {
       robot.limelight.setTarget(robot.getAllianceColor().getSteadyState());
     }
     robot.follower.update();
-    robot.intake.updateAutoCycle();
     robot.outtake.updatePIDControl();
     aim();
     boolean ready = robot.limelight.hasValidTarget()
