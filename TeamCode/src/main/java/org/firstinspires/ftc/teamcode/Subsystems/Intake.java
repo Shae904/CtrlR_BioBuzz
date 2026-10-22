@@ -29,9 +29,15 @@ public class Intake {
 
   public static int CLOSE_DELAY = 500;
 
-  public static double FLAPPER_SHOOT = 0.1;
+  /**
+   * The flapper (the "slapper" gate between the hopper and the flywheel) has two positions: UP = open, balls feed
+   * into the flywheel (held triangle in teleop, shooting in the autos); DOWN = shut, the hopper holds its balls while
+   * intaking. It starts DOWN at INIT. Live-tunable in Panels: if the slapper moves the wrong way on the new mount,
+   * swap these two numbers (DECODE's values until measured on this robot).
+   */
+  public static double FLAPPER_UP = 0.1;
 
-  public static double FLAPPER_LOCKED = 0.35; //.45
+  public static double FLAPPER_DOWN = 0.35;
 
   public static double CYCLER_LOCKED = .63;
 
@@ -43,8 +49,10 @@ public class Intake {
   private int remainingCycles = 0;
 
 
-   public ServoImplEx gate;
-  public ServoImplEx cycler;
+  public final ServoImplEx gate;
+  /** DECODE's cycler servo; null when the robot configuration has none (the BIOBUZZ robot may not carry it). */
+  public final ServoImplEx cycler;
+  private boolean flapperUp;
 
   public enum FlapperState {CYCLE, SHOOT, LOCKED}
 
@@ -59,8 +67,19 @@ public class Intake {
 
     intakeMotor.setMode(RunMode.RUN_WITHOUT_ENCODER);
 
-     gate = hardwareMap.get(ServoImplEx.class, "flapper");
-    cycler = hardwareMap.get(ServoImplEx.class, "cycler");
+    gate = hardwareMap.get(ServoImplEx.class, "flapper");
+    cycler = hardwareMap.tryGet(ServoImplEx.class, "cycler");
+    setFlapper(false);   // starts DOWN (shut)
+  }
+
+  /** Raises (true, open: feed) or lowers (false, shut: hold) the flapper. */
+  public void setFlapper(boolean up) {
+    flapperUp = up;
+    gate.setPosition(up ? FLAPPER_UP : FLAPPER_DOWN);
+  }
+
+  public boolean isFlapperUp() {
+    return flapperUp;
   }
 
   public void setCyclePosition(FlapperState state) {
@@ -69,22 +88,25 @@ public class Intake {
 
         break;
       case SHOOT:
-        this.setFlapperPos(FLAPPER_SHOOT);
+        this.setFlapper(true);
         this.setCyclerPos(CYCLER_LOCKED);
         break;
       case LOCKED:
-        this.setFlapperPos(FLAPPER_LOCKED);
+        this.setFlapper(false);
         this.setCyclerPos(CYCLER_LOCKED);
         break;
     }
   }
 
+  /** Raw servo position (MOTOR TESTING); {@link #setFlapper(boolean)} is the normal way. */
   public void setFlapperPos(double pos) {
-     gate.setPosition(pos);
+    gate.setPosition(pos);
   }
 
   public void setCyclerPos(double pos) {
-    cycler.setPosition(pos);
+    if (cycler != null) {
+      cycler.setPosition(pos);
+    }
   }
 
   public void setIntakePower(double pow) {

@@ -6,7 +6,6 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.teamcode.Robot;
-import org.firstinspires.ftc.teamcode.Subsystems.Intake.FlapperState;
 import org.firstinspires.ftc.teamcode.Subsystems.Outtake;
 
 @Configurable
@@ -16,8 +15,6 @@ public class BaseTeleop {
   final LinearOpMode opMode;
   final Telemetry telemetry;
   double headingOffset;
-
-  private boolean flapUp = false;
 
   private boolean autoCalculateShootPower = true;
 
@@ -32,6 +29,7 @@ public class BaseTeleop {
   public void run() {
     // --- INIT ---
     // --- INIT LOOP ---
+    robot.intake.setFlapper(false);   // DOWN before the match starts, wherever the last opmode left it
     while (this.opMode.opModeInInit()) {
       telemetry.addData("ALLIANCE COLOR", robot.getAllianceColor());
       telemetry.update();
@@ -56,12 +54,8 @@ public class BaseTeleop {
 
       this.fieldCentricDrive(x, y, rotStickAvg);
 
-      // OUTTAKE
-      if (this.opMode.gamepad2.triangle || this.opMode.gamepad1.triangle) {
-        robot.intake.setCyclePosition(FlapperState.SHOOT);
-      } else {
-        robot.intake.setCyclePosition(FlapperState.LOCKED);
-      }
+      // FLAPPER: up (feeding) only while triangle is held on either pad, down otherwise
+      robot.intake.setFlapper(this.opMode.gamepad2.triangle || this.opMode.gamepad1.triangle);
 
       if (this.opMode.gamepad2.right_stick_button) {
         this.opMode.gamepad2.rumble(500);
