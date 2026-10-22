@@ -34,6 +34,10 @@ public class Tuning {
 
   @Tuner(name = "Tests")
   public static Procedure tests() {
-    return new Tests(Constants::createDrivetrain, Constants::createLocalizer, () -> new Foresight(Constants.foresightConfig));
+    return new Tests(
+            Constants::createDrivetrain,
+            Constants::createLocalizer,
+            () -> new Foresight(Constants.foresightConfig)
+    );
   }
 }

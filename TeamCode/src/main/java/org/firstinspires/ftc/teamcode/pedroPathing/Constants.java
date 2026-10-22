@@ -50,48 +50,44 @@ public class Constants {
   // (Y) pod's forward position (forward positive). Starting values from the CAD / the old ThreeWheel constants (left
   // pod 7.5 in left of centre, strafe pod 2 in behind it); directions assume both pods count forward / left.
   // Tune all four with AutoTune's "Pinpoint Tuner" (pedroPathing/procedures/PinpointTuner): push forward, push left,
-  // spin 180 deg CCW, then paste its block here.
+  // spin 180 deg  CCW, then paste its block here.
   public static PinpointConfig localizerConfig = new PinpointConfig(c -> {
     c.name.set("pinpoint");
     c.podType.set(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_4_BAR_POD);   // 32 mm wheel, 2000 CPR
-    c.xPodOffset.set(7.5);
-    c.yPodOffset.set(-2.0);
-    c.xPodDirection.set(GoBildaPinpointDriver.EncoderDirection.FORWARD);
-    c.yPodDirection.set(GoBildaPinpointDriver.EncoderDirection.FORWARD);
+    c.xPodOffset.set(7.48184);
+    c.yPodOffset.set(2.46908);
+    c.xPodDirection.set(GoBildaPinpointDriver.EncoderDirection.REVERSED);
+    c.yPodDirection.set(GoBildaPinpointDriver.EncoderDirection.REVERSED);
     c.globalDistanceUnit.set(DistanceUnit.INCH);
     c.offsetUnits.set(DistanceUnit.INCH);
   });
 
   // ---- Algorithm (2.x FollowerConstants + PathConstraints) --------------------------------------------------------
-  public static ForesightConfig foresightConfig = new ForesightConfig(c -> {
-    // Same physical quantities, measured the same way by the 2.x and 3.x tuners:
-    c.maxAchievableForwardVelocity.set(80.21);      // 2.x MecanumConstants.xVelocity (in/s)
-    c.maxAchievableStrafeVelocity.set(65.9686);     // 2.x MecanumConstants.yVelocity (in/s)
-    c.naturalForwardDeceleration.set(57.3022);      // 2.x forwardZeroPowerAcceleration(-57.3022), sign flipped
-    c.naturalStrafeDeceleration.set(64.598);        // 2.x lateralZeroPowerAcceleration(-64.598), sign flipped
+  public static ForesightConfig foresightConfig = new ForesightConfig(
+          c -> {
+            Controller primaryTranslationalForward = Controller.proportional(0.4558351910046569);
+            Controller secondaryTranslationalForward = Controller.proportional(0.1684189229355922);
+            Controller primaryTranslationalLateral = Controller.proportional(0.691455510377392);
+            Controller secondaryTranslationalLateral = Controller.proportional(0.2554743350529311);
 
-    // 2.x PIDF gains as stateless bring-up controllers (Foresight evaluates heading twice per update, so a stateful
-    // Controller.pid(...) D term would differentiate across two different errors; AutoTune emits proportional ones):
-    c.headingFeedback.set(Controller.proportional(1.6));   // 2.x headingPIDF P=1.6 (D=0.07 dropped, F=0)
-    c.forwardTranslational.set(                             // 2.x translationalPIDF P=0.14, F=0.02 (D=0.02 dropped)
-        Controller.proportional(0.14).plus(Controller.staticFeedforward(0.02)));
-    c.strafeTranslational.set(
-        Controller.proportional(0.14).plus(Controller.staticFeedforward(0.02)));
+            c.forwardTranslational.set(Controller.piecewise(secondaryTranslationalForward).put(2.5, primaryTranslationalForward));
+            c.strafeTranslational.set(Controller.piecewise(secondaryTranslationalLateral).put(2.5, primaryTranslationalLateral));
 
-    // ESTIMATE (no 2.x equivalent; 2.x drivePIDF and mass have none): velocity -> power maps and brake model.
-    c.coast.set(Controller.proportionalFeedforward(1.0 / 80.21));   // ~1/maxForwardVelocity
-    c.brake.set(Controller.proportionalFeedforward(1.0 / 80.21));
-    // Stopping distance d(v) = linear*v + quadratic*v|v| per body axis. Seeded with the 2.x zero-power (coast) model
-    // d = v^2 / (2 * natural decel): over-predicts the braked distance, so the robot starts braking early (safe).
-    c.linearBrakeCoefficients.set(Matrix.diag(0.0, 0.0));
-    c.quadraticBrakeCoefficients.set(Matrix.diag(1.0 / (2 * 57.3022), 1.0 / (2 * 64.598)));
-    c.headingBrakeCoefficients.set(Vector2D.cartesian(0.0, 0.0));   // no heading-stop prediction until tuned
+            c.coast.set(Controller.proportionalFeedforward(0.014309236183918803));
+            c.brake.set(Controller.proportionalFeedforward(0.012162850756330983));
 
-    // 2.x PathConstraints(0.99, 100, 1, 1): tValue 0.99 -> 1 - 0.99; velocity 0.1 / translational 0.1 /
-    // heading 0.007 / timeout 100 are the 3.x defaults already; brakingStrength/brakingStart have no equivalent
-    // (closest: brakeAggression, default 1.0 = no bias).
-    c.parametricTConstraint.set(0.01);
-  });
+            c.headingFeedback.set(Controller.proportional(6.383694091682272));
+            c.headingBrakeCoefficients.set(Vector2D.cartesian(0.04459341175390769, 0.005695790625929388));
+
+            c.linearBrakeCoefficients.set(Matrix.diag(0.11232686228669889, 0.04853571666176151));
+            c.quadraticBrakeCoefficients.set(Matrix.diag(0.00119311498172834, 0.0019764676218240436));
+
+            c.maxAchievableForwardVelocity.set(72.71106855519396);
+            c.maxAchievableStrafeVelocity.set(56.63592285408346);
+            c.naturalForwardDeceleration.set(33.597201318488835);
+            c.naturalStrafeDeceleration.set(77.99747854763653);
+          }
+  );
 
   public static Localizer createLocalizer(HardwareMap hardwareMap) {
     return new PinpointLocalizer(hardwareMap, localizerConfig);
