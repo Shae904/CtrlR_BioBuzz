@@ -35,9 +35,9 @@ public class Intake {
    * intaking. It starts DOWN at INIT. Live-tunable in Panels: if the slapper moves the wrong way on the new mount,
    * swap these two numbers (DECODE's values until measured on this robot).
    */
-  public static double FLAPPER_UP = 0.1;
+  public static double FLAPPER_UP = 0.27;
 
-  public static double FLAPPER_DOWN = 0.35;
+  public static double FLAPPER_DOWN = 0.1;
 
   public static double CYCLER_LOCKED = .63;
 
