@@ -21,9 +21,8 @@ public class Intake {
 
   /**
    * The flapper has two positions: UP = open, balls feed into the flywheel (held triangle in teleop, shooting in the
-   * autos); DOWN = shut, the hopper holds its balls while intaking. It starts DOWN at INIT. Live-tunable in Panels: if
-   * the slapper moves the wrong way on the new mount, swap these two numbers (DECODE's values until measured on this
-   * robot).
+   * autos); DOWN = shut, the hopper holds its balls while intaking. It starts DOWN at INIT. Live-tunable in Panels.
+   * Measured on the slapper 2026-10-22 (CommanderSleepy): 0.27 up, 0.1 down.
    */
   public static double FLAPPER_UP = 0.27;
 
