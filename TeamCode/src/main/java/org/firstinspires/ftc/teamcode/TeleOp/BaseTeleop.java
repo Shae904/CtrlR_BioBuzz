@@ -17,6 +17,8 @@ public class BaseTeleop {
   final Telemetry telemetry;
   double headingOffset;
 
+  private boolean flapUp = false;
+
   private boolean autoCalculateShootPower = true;
 
   public BaseTeleop(LinearOpMode opMode, Robot robot, double headingOffset) {
@@ -57,7 +59,7 @@ public class BaseTeleop {
       // OUTTAKE
       if (this.opMode.gamepad2.triangle || this.opMode.gamepad1.triangle) {
         robot.intake.setCyclePosition(FlapperState.SHOOT);
-      } else if (robot.intake.isCycleFinished()) {
+      } else {
         robot.intake.setCyclePosition(FlapperState.LOCKED);
       }
 
