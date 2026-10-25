@@ -4,6 +4,7 @@ import com.bylazar.configurables.annotations.Configurable;
 import com.qualcomm.hardware.limelightvision.LLResult;
 import com.qualcomm.hardware.limelightvision.LLResultTypes.FiducialResult;
 import com.qualcomm.hardware.limelightvision.Limelight3A;
+import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.Servo;
@@ -90,7 +91,11 @@ public class Limelight {
     this.currentColor = color;
     this.limelight = hardwareMap.get(Limelight3A.class, "limelight");
     this.limelight.start();
-    this.limelight.pipelineSwitch(this.currentColor.getLLPipelineTeleOP());
+    if(getClass().isAnnotationPresent(Autonomous.class)){
+      this.limelight.pipelineSwitch(this.currentColor.getLLPipelineAuto());
+    } else {
+      this.limelight.pipelineSwitch(this.currentColor.getLLPipelineTeleOP());
+    }
 
     this.lastTarget = this.currentColor.getSteadyState();
     this.turretPosition = this.currentColor.getSteadyState();

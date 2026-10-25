@@ -20,9 +20,11 @@ public class BaseHive4 extends BaseHiveAuto {
   /** RED: straight out from the audience wall first (clear of the wall before turning), x in, y in. */
   public static double[] OUT_RED = {46.0, 22.0};
   /** RED shooting spot, x in, y in: ~1.43 m from the CELL opening, 47 deg off its axis, clear of the garden pollen. */
-  public static double[] SHOOT_RED = {16.5, 16.5};
+  public static double[] SHOOT_RED = {12, 20};
   /** RED upward CELL opening (the audience CELL at the start), x in, y in. */
   public static double[] CELL_RED = {57.8, 54.8};
+
+  public static double[] PARK_RED = {14.0, 106.0, 90};
 
   /**
    * The tags' mean tx (deg) at which the shooter points at the CELL opening from the shooting spot: the camera sits
@@ -62,7 +64,11 @@ public class BaseHive4 extends BaseHiveAuto {
     shootVolley();
 
     // --- hold the shooting spot until AUTO ends ---
-    phase = "DONE";
+    phase = "PARK";
+    stopAiming();
+    Pose park = fieldPose(PARK_RED);
+    driveTo(Paths.line(shoot, park).linear(shoot, park), 6000);
+    phase = "PARKED";
     holdUntilEnd();
   }
 }

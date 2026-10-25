@@ -8,6 +8,8 @@ public enum AllianceColor {
       return 1;
     }
 
+    public int getLLPipelineAuto() { return 3; }
+
     @Override
     public int getAimPose() {
       return -5;
@@ -28,6 +30,8 @@ public enum AllianceColor {
       return 2; // TODO: make these in LL
     }
 
+    public int getLLPipelineAuto() { return 4; }
+
     @Override
     public int getAimPose() {
       return -1;
@@ -41,6 +45,8 @@ public enum AllianceColor {
   };
 
   public abstract int getLLPipelineTeleOP();
+
+  public abstract  int getLLPipelineAuto();
 
   public abstract int getAimPose();
 
