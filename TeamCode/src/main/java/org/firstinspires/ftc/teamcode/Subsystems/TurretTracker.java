@@ -29,6 +29,11 @@ public class TurretTracker {
   /** Turret position limits (deg, 180 = forward). The default 0..360 keeps the seam straight back (as before). */
   public static double TURRET_MIN_DEG = 0;
   public static double TURRET_MAX_DEG = 360;
+  /**
+   * Seam hysteresis (deg): a target up to this far past a limit holds the turret at that limit instead of swinging the
+   * long way round, so a heading wobble around the seam does not flip it back and forth.
+   */
+  public static double SEAM_HYSTERESIS_DEG = 15;
   /** After the tags are lost, keep the last seen field direction this long (ms) before the odometry pre-aim. */
   public static int LOST_HOLD_MS = 500;
   /** A frame asking for a bigger turn than this (deg) is ignored (the tags are inside the camera's +/-27 deg view). */
@@ -100,6 +105,11 @@ public class TurretTracker {
     return true;
   }
 
+  /** Forget the last fix (the target CELL changed). */
+  public void clearFix() {
+    hasFix = false;
+  }
+
   /** A vision fix no older than LOST_HOLD_MS. */
   public boolean hasRecentFix(long nowNs) {
     return hasFix && nowNs - fixNs <= LOST_HOLD_MS * 1_000_000L;
@@ -125,19 +135,25 @@ public class TurretTracker {
     return Math.toDegrees(Math.atan2(pointYIn - axisY, pointXIn - axisX));
   }
 
-  /** The equivalent of {@code target} (+/- 360) inside the limits closest to {@code turretNow}, else the nearer limit. */
+  /**
+   * The equivalent of {@code target} (+/- 360) closest to {@code turretNow} among those inside the limits widened by
+   * SEAM_HYSTERESIS_DEG, clamped to the limits (so just past the seam the turret waits at the limit on its side);
+   * else the nearer limit.
+   */
   public static double limit(double target, double turretNow) {
     double best = Double.NaN;
     double base = target - 360 * Math.floor((target - TURRET_MIN_DEG) / 360);   // in [MIN, MIN + 360)
+    double lo = TURRET_MIN_DEG - SEAM_HYSTERESIS_DEG;
+    double hi = TURRET_MAX_DEG + SEAM_HYSTERESIS_DEG;
     for (int k = -1; k <= 1; k++) {
       double c = base + 360 * k;
-      if (c >= TURRET_MIN_DEG - 1e-9 && c <= TURRET_MAX_DEG + 1e-9
+      if (c >= lo - 1e-9 && c <= hi + 1e-9
           && (Double.isNaN(best) || Math.abs(c - turretNow) < Math.abs(best - turretNow))) {
         best = c;
       }
     }
     if (!Double.isNaN(best)) {
-      return best;
+      return Math.max(TURRET_MIN_DEG, Math.min(TURRET_MAX_DEG, best));
     }
     // Out of reach: the limit the target is angularly nearer to
     double toMax = Math.abs(wrapDeg(base - TURRET_MAX_DEG));

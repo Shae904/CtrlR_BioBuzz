@@ -27,8 +27,8 @@ public class SensorTest extends LinearOpMode {
     limelight.start();
     while (opModeIsActive()) {
       LLResult result = limelight.getLatestResult();
-      List<FiducialResult> fiducials = result.getFiducialResults();
-      if (result.isValid()) {
+      if (result != null && result.isValid()) {
+        List<FiducialResult> fiducials = result.getFiducialResults();
         Pose3D botPose = result.getBotpose();
         telemetry.addData("tx", result.getTx());
         telemetry.addData("ty", result.getTy());
