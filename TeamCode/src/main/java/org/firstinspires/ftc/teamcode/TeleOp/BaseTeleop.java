@@ -11,6 +11,7 @@ import org.firstinspires.ftc.teamcode.AllianceColor;
 import org.firstinspires.ftc.teamcode.PoseStorage;
 import org.firstinspires.ftc.teamcode.Robot;
 import org.firstinspires.ftc.teamcode.Subsystems.HiveTargeting;
+import org.firstinspires.ftc.teamcode.Subsystems.Limelight;
 import org.firstinspires.ftc.teamcode.Subsystems.Outtake;
 
 @Configurable
@@ -23,8 +24,12 @@ public class BaseTeleop {
 
   private boolean autoCalculateShootPower = true;
 
-  /** Which CELL the Limelight targets: from odometry, or the cross (AUDIENCE) / circle (SCORING) buttons. */
-  private HiveTargeting targeting;
+  /** Field trims per gamepad2 dpad press (auto-speed mode): flywheel ticks/s (up/down) and turret aim deg (left/right). */
+  public static double SPEED_TRIM_STEP = 10;
+  public static double AIM_TRIM_STEP = 0.5;
+
+  /** Which CELL the Limelight targets: gamepad2 X = AUDIENCE, B = SCORING (Xbox layout); no automatic switching. */
+  private HiveTargeting.Cell cell;
   private String poseSource = "";
   private final ElapsedTime pipelineMismatch = new ElapsedTime();
 
@@ -49,15 +54,16 @@ public class BaseTeleop {
       poseSource = "no AUTO just before: assumes the AUTO start spot";
     }
     robot.follower.setPose(start);
-    targeting = new HiveTargeting(start.y());
-    robot.limelight.targetCell(targeting.cell());
+    cell = HiveTargeting.initialCell(start.y());   // the side the robot starts on; the drivers switch with X / B
+    robot.limelight.targetCell(cell);
 
-    // --- INIT LOOP --- (the CELL buttons and the wall reset work here too)
+    // --- INIT LOOP --- (the CELL buttons, the wall reset and the trims work here too)
     while (this.opMode.opModeInInit()) {
       this.robot.clearBulkCache();
       this.robot.follower.update();
       this.resetOdometryAtWall();
       this.updateCellTarget();
+      this.updateTrims();
       // drop presses of the match-only buttons made during INIT (they would fire at START)
       this.opMode.gamepad1.dpadUpWasPressed();
       this.opMode.gamepad1.dpadLeftWasPressed();
@@ -77,6 +83,7 @@ public class BaseTeleop {
       this.robot.follower.update();
       this.resetOdometryAtWall();
       this.updateCellTarget();
+      this.updateTrims();
 
       // DRIVETRAIN
       double x = this.opMode.gamepad1.left_stick_x;
@@ -141,40 +148,64 @@ public class BaseTeleop {
   }
 
   /**
-   * LIMELIGHT CELL: automatic from the odometry y (the two tile rows along the audience wall = AUDIENCE CELL, along
-   * the far wall = SCORING CELL, the middle rows keep the last one); cross = AUDIENCE, circle = SCORING on either
-   * gamepad override it until odometry puts the robot in the outer tiles of the chosen side.
+   * LIMELIGHT CELL, manual (gamepad2, Xbox layout): X = our AUDIENCE CELL (RED 34-37 / BLUE 38-41, pipeline 5 / 6),
+   * B = our SCORING CELL (RED 30-33 / BLUE 42-45, pipeline 3 / 4). Same buttons for both alliances.
    */
   private void updateCellTarget() {
-    // read all four so no press is left over for a later loop
-    boolean audience1 = this.opMode.gamepad1.crossWasPressed();
-    boolean audience2 = this.opMode.gamepad2.crossWasPressed();
-    boolean scoring1 = this.opMode.gamepad1.circleWasPressed();
-    boolean scoring2 = this.opMode.gamepad2.circleWasPressed();
-    if (audience1 || scoring1) {
-      this.opMode.gamepad1.rumble(150);
+    boolean audience = this.opMode.gamepad2.xWasPressed();
+    boolean scoring = this.opMode.gamepad2.bWasPressed();
+    if (audience) {
+      cell = HiveTargeting.Cell.AUDIENCE;
+    } else if (scoring) {
+      cell = HiveTargeting.Cell.SCORING;
     }
-    if (audience2 || scoring2) {
+    if (audience || scoring) {
       this.opMode.gamepad2.rumble(150);
     }
-    HiveTargeting.Cell cell = targeting.update(robot.follower.pose().y(), audience1 || audience2,
-        scoring1 || scoring2);
     robot.limelight.targetCell(cell);
   }
 
   /**
-   * ODOMETRY RESET (gamepad2 square): with the robot pushed against the AUDIENCE wall (anywhere along it, any face),
+   * FIELD TRIMS (gamepad2 dpad, auto-speed mode only; in manual-speed mode the dpad keeps its speed presets):
+   * up / down = flywheel +/- SPEED_TRIM_STEP ticks/s on top of the formula (Limelight.SHOT_TRIM_TICKS), right / left =
+   * turret aim +/- AIM_TRIM_STEP deg (Limelight.AIM_TRIM_DEG, + = right). They last until the app restarts or new code
+   * is deployed: copy the numbers from telemetry into Limelight.java once they're right.
+   */
+  private void updateTrims() {
+    boolean up = this.opMode.gamepad2.dpadUpWasPressed();
+    boolean down = this.opMode.gamepad2.dpadDownWasPressed();
+    boolean right = this.opMode.gamepad2.dpadRightWasPressed();
+    boolean left = this.opMode.gamepad2.dpadLeftWasPressed();
+    if (!autoCalculateShootPower) {
+      return;
+    }
+    if (up) {
+      Limelight.SHOT_TRIM_TICKS += SPEED_TRIM_STEP;
+    } else if (down) {
+      Limelight.SHOT_TRIM_TICKS -= SPEED_TRIM_STEP;
+    }
+    if (right) {
+      Limelight.AIM_TRIM_DEG += AIM_TRIM_STEP;
+    } else if (left) {
+      Limelight.AIM_TRIM_DEG -= AIM_TRIM_STEP;
+    }
+    if (up || down || right || left) {
+      this.opMode.gamepad2.rumble(80);
+    }
+  }
+
+  /**
+   * ODOMETRY RESET (gamepad2 back / view): with the robot pushed against the AUDIENCE wall (anywhere along it, any face),
    * sets the odometry y to the robot centre's distance from that wall (from the footprint and the heading); x and
-   * heading are kept, since only y decides the CELL. Automatic CELL switching resumes.
+   * heading are kept. Only the turret's pre-aim (no tags in view) uses the odometry now.
    */
   private void resetOdometryAtWall() {
-    if (!this.opMode.gamepad2.squareWasPressed()) {
+    if (!this.opMode.gamepad2.backWasPressed()) {
       return;
     }
     Pose p = robot.follower.pose();
     double y = HiveTargeting.audienceWallY(p.heading());
     robot.follower.setPose(new Pose(p.x(), y, p.heading()));
-    targeting.odometryReset(y);
     poseSource = String.format("y reset at the audience wall (%.1f in, %s)", y,
         this.opMode.opModeInInit() ? "in INIT" : "in the match");
     this.opMode.gamepad2.rumble(400);
@@ -184,9 +215,10 @@ public class BaseTeleop {
     Pose p = robot.follower.pose();
     int requested = robot.limelight.requestedPipeline();
     int running = robot.limelight.runningPipeline();
-    telemetry.addData("Target CELL", "%s %s, pipeline %d (%s)", robot.getAllianceColor(), targeting.cell(), requested,
-        targeting.isAuto() ? "auto" : "manual until the " + targeting.cell().name().toLowerCase() + " tiles");
-    telemetry.addData("Zone", "%s (y %.1f in)", targeting.zone(), p.y());
+    telemetry.addData("Target CELL", "%s %s, pipeline %d  (gp2 X = audience, B = scoring)", robot.getAllianceColor(),
+        cell, requested);
+    telemetry.addData("Trims", "speed %+.0f ticks/s (gp2 dpad up/down), aim %+.1f deg (dpad right/left)%s",
+        Limelight.SHOT_TRIM_TICKS, Limelight.AIM_TRIM_DEG, Limelight.SHOT_MODEL_58_DEG ? ", 58 deg model" : "");
     if (robot.limelight.hasValidTarget()) {
       telemetry.addData("Aim", "%s: %d tags, turn %+.1f deg, opening %.2f m, aimed within %.1f deg%s",
           robot.limelight.aimSource(), robot.limelight.hiveTagCount, robot.limelight.aimCorrectionDeg(),
@@ -194,13 +226,21 @@ public class BaseTeleop {
     } else {
       telemetry.addData("Aim", "%s: no tags of the target CELL", robot.limelight.aimSource());
     }
+    if (robot.limelight.isTooClose()) {
+      telemetry.addLine(String.format("TOO CLOSE: %.2f m to the opening (under %.2f): the formula's speed climbs, back up",
+          robot.limelight.distance, Limelight.TOO_CLOSE_M));
+    }
+    if (robot.limelight.distanceSuspect()) {
+      telemetry.addLine(String.format("WARNING: 3D distance is %.2fx the tag-height distance: check this pipeline's "
+          + "marker size (82.55 mm) and Full 3D", 1 / robot.limelight.distanceCheckRatio));
+    }
     if (robot.limelight.tagsWithout3d > 0) {
       telemetry.addLine("WARNING: " + robot.limelight.tagsWithout3d
           + " tag(s) without a 3D pose (ignored): turn on Full 3D in this Limelight pipeline");
     }
     telemetry.addData("Turret error", robot.limelight.error);   // a number: plot it in Panels' Graph to tune AIM_*
     telemetry.addData("Pose", "x %.1f  y %.1f  h %.0f deg", p.x(), p.y(), Math.toDegrees(p.heading()));
-    telemetry.addData("Pose from", "%s  (gp2 square = reset y at the audience wall)", poseSource);
+    telemetry.addData("Pose from", "%s  (gp2 back = reset y at the audience wall)", poseSource);
     if (running == requested || running < 0) {
       pipelineMismatch.reset();
     } else if (pipelineMismatch.seconds() > 1.0) {

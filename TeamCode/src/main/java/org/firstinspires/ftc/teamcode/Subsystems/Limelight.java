@@ -70,6 +70,28 @@ public class Limelight {
   public static double TOF_A = 1.505;
   public static double TOF_B = 1.44;
 
+  /**
+   * The same fit for a 58 deg launch, the default since 2026-11-04: Logger Pro measured ~58 deg on the robot
+   * (2026-10-21), and ghettoturret v11 (2026-10-23) has HoodExitAngle 53 deg (+ the 4.6 deg spring-back = 57.6; the
+   * fit above assumes the old 48 deg hood, 52.6). Both give 1140 at the auto corner (1.54 m); the 58 deg one asks for
+   * less closer in (1.3 m: 1144 vs 1208, which shot over) and more farther out (2.0 m: 1198 vs 1145, 3.0 m: 1386 vs
+   * 1279). false = back to the 52.6 deg fit (Panels).
+   */
+  public static boolean SHOT_MODEL_58_DEG = true;
+  public static double SHOT58_A = 0.295833167927;
+  public static double SHOT58_B = 0.212244897959;
+  public static double SHOT58_K = 0.0021473714554;
+  public static double SHOT58_OFFSET = -314;
+  public static double SHOT58_MOVE_GAIN = 93 * Math.cos(Math.toRadians(58));
+  public static double TOF58_A = 1.870;
+  public static double TOF58_B = 1.54;
+  /** Flywheel trim added to the formula (ticks/s, + = faster): Panels, or gamepad2 dpad up/down in the teleop. */
+  public static double SHOT_TRIM_TICKS = 0;
+  /** Closer than this (m, camera to opening) the formula's speed climbs steeply (52.6 deg: 1.2 m -> 1279): warn. */
+  public static double TOO_CLOSE_M = 1.3;
+  /** The 3D distance may differ from the tag-height distance by this fraction before telemetry warns (marker size?). */
+  public static double DISTANCE_CHECK_TOLERANCE = 0.15;
+
 
   // --- Per-CELL pipelines (Limelight web UI): each sees one CELL's 4 tags. The TELEOP picks the CELL from odometry
   //     (HiveTargeting, targetCell); the autos stay on the alliance pipeline (both CELLS, getLLPipelineTeleOP). ---
@@ -124,6 +146,12 @@ public class Limelight {
   private long odometryPreaimSinceNs = -1;   // when this aiming session's odometry pre-aim started (-1: not yet)
   /** Our tags seen this frame without a 3D pose (ignored: up/down can't be checked); > 0 means Full 3D is off. */
   public int tagsWithout3d;
+  /**
+   * Cross-check of the target CELL's distance: (distance from the tags' known up-cell height and the camera's pitch) /
+   * (distance from the Limelight's 3D poses). ~1 when both agree; ~2 or ~0.5 = the pipeline's marker size is wrong
+   * (it scales the 3D distance), NaN = no target.
+   */
+  public double distanceCheckRatio = Double.NaN;
 
   public double target;
 
@@ -224,6 +252,7 @@ public class Limelight {
     this.hiveSeen = false;
     this.hiveTagCount = 0;
     this.tagsWithout3d = 0;
+    this.distanceCheckRatio = Double.NaN;
     if (currentGoal == null || !currentGoal.isValid()) {
       return;
     }
@@ -232,6 +261,8 @@ public class Limelight {
       cluster.clear();
     }
     double[] sumHeight = new double[4];
+    double[] sumRange3d = new double[4];
+    double[] sumRangeFromHeight = new double[4];
     int[] count = new int[4];
     int onlyCell = targetCell == null ? -1 : cellIndex(currentColor, targetCell);
     for (FiducialResult tag : currentGoal.getFiducialResults()) {
@@ -248,6 +279,7 @@ public class Limelight {
       double tanTx = Math.tan(Math.toRadians(tag.getTargetXDegreesNoCrosshair()));
       double tanTy = Math.tan(Math.toRadians(tag.getTargetYDegreesNoCrosshair()));
       double rayFwd = Math.cos(pitch) - tanTy * Math.sin(pitch);
+      double rayUp = Math.sin(pitch) + tanTy * Math.cos(pitch);
       // Horizontal bearing in the level frame (+ = right)
       double bearing = Math.atan2(tanTx, rayFwd);
       Pose3D pose = tag.getTargetPoseCameraSpace();
@@ -259,7 +291,12 @@ public class Limelight {
       double fwd = p.z * Math.cos(pitch) + p.y * Math.sin(pitch);
       double up = p.z * Math.sin(pitch) - p.y * Math.cos(pitch);
       sumHeight[cell] += LENS_HEIGHT_M + up;
-      clusters[cell].add((id - 30) % 4, bearing, Math.hypot(p.x, fwd));
+      double range = Math.hypot(p.x, fwd);
+      clusters[cell].add((id - 30) % 4, bearing, range);
+      sumRange3d[cell] += range;
+      // the same distance from the ray's elevation and the up CELL's tag height (independent of the marker size)
+      sumRangeFromHeight[cell] += rayUp > 0.01
+          ? (UP_CELL_TAG_HEIGHT_M - LENS_HEIGHT_M) * Math.hypot(tanTx, rayFwd) / rayUp : range;
       count[cell]++;
     }
 
@@ -291,6 +328,17 @@ public class Limelight {
     this.aimCorrection = aim.correctionDeg;
     this.distance = aim.formulaDistanceM;
     this.windowDeg = aim.windowDeg;
+    this.distanceCheckRatio = sumRangeFromHeight[best] / sumRange3d[best];
+  }
+
+  /** The 3D distance disagrees with the tag-height distance (check the pipeline's marker size: 82.55 mm). */
+  public boolean distanceSuspect() {
+    return !Double.isNaN(distanceCheckRatio) && Math.abs(distanceCheckRatio - 1) > DISTANCE_CHECK_TOLERANCE;
+  }
+
+  /** Seeing the target from closer than TOO_CLOSE_M: the formula's speed climbs steeply there. */
+  public boolean isTooClose() {
+    return this.hasValidTarget() && distance < TOO_CLOSE_M;
   }
 
   /** The turret turn (deg, + = right) the last frame asked for, before the trim and the lead. */
@@ -364,11 +412,12 @@ public class Limelight {
    */
   public double calculateTargetVelocity() {
     if (this.hasValidTarget()) {
-      double q = SHOT_A * distance - SHOT_B;
+      boolean m58 = SHOT_MODEL_58_DEG;
+      double q = (m58 ? SHOT58_A : SHOT_A) * distance - (m58 ? SHOT58_B : SHOT_B);
       if (q > 0) {
-        // Shot formula from the CAD + physics model (see SHOT_* constants)
-        double ticks = (distance * Math.pow(q, -0.5)) / SHOT_K + SHOT_OFFSET
-            - vParallel * SHOT_MOVE_GAIN;
+        // Shot formula from the CAD + physics model (see SHOT_* constants), plus the field trim
+        double ticks = (distance * Math.pow(q, -0.5)) / (m58 ? SHOT58_K : SHOT_K) + (m58 ? SHOT58_OFFSET : SHOT_OFFSET)
+            - vParallel * (m58 ? SHOT58_MOVE_GAIN : SHOT_MOVE_GAIN) + SHOT_TRIM_TICKS;
         lastCalculatedVel = 20.0 * Math.round(ticks / 20.0);
       }
     }
@@ -376,7 +425,9 @@ public class Limelight {
   }
 
   private double calculateLeadAngleDegrees() {
-    double timeOfFlight = Math.sqrt(Math.max(2 * (TOF_A * distance - TOF_B) / 9.8, 0.0025));
+    double tofA = SHOT_MODEL_58_DEG ? TOF58_A : TOF_A;
+    double tofB = SHOT_MODEL_58_DEG ? TOF58_B : TOF_B;
+    double timeOfFlight = Math.sqrt(Math.max(2 * (tofA * distance - tofB) / 9.8, 0.0025));
     return Math.toDegrees(Math.atan((vPerpendicular * timeOfFlight) / distance));
   }
 
