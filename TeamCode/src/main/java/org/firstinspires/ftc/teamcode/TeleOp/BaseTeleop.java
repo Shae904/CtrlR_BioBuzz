@@ -58,6 +58,11 @@ public class BaseTeleop {
       this.robot.follower.update();
       this.resetOdometryAtWall();
       this.updateCellTarget();
+      // drop presses of the match-only buttons made during INIT (they would fire at START)
+      this.opMode.gamepad1.dpadUpWasPressed();
+      this.opMode.gamepad1.dpadLeftWasPressed();
+      this.opMode.gamepad1.leftBumperWasPressed();
+      this.opMode.gamepad2.leftBumperWasPressed();
       telemetry.addData("ALLIANCE COLOR", robot.getAllianceColor());
       telemetry.addLine("Turret must point " + (robot.getAllianceColor() == AllianceColor.RED
           ? "LEFT" : "RIGHT") + " (its rest) when INIT is pressed: the encoder zeroes there");
@@ -93,6 +98,7 @@ public class BaseTeleop {
         autoCalculateShootPower = false;
       }
 
+      boolean formulaRead = this.opMode.gamepad2.leftBumperWasPressed();   // read every loop: no stale press later
       if (this.opMode.gamepad1.dpad_down) {
         robot.outtake.stop();
       } else if (autoCalculateShootPower) {
@@ -108,7 +114,7 @@ public class BaseTeleop {
           robot.outtake.setTargetVelocity(Outtake.medSpeed);
         } else if (this.opMode.gamepad2.dpad_right) {
           robot.outtake.setTargetVelocity(Outtake.cycleSpeed);
-        } else if (this.opMode.gamepad2.leftBumperWasPressed()) {
+        } else if (formulaRead) {
           robot.outtake.setTargetVelocity(robot.limelight.calculateTargetVelocity());
         }
       }
@@ -187,6 +193,10 @@ public class BaseTeleop {
           robot.limelight.distance, robot.limelight.aimedThresholdDeg(), robot.limelight.isAimed() ? " - AIMED" : "");
     } else {
       telemetry.addData("Aim", "%s: no tags of the target CELL", robot.limelight.aimSource());
+    }
+    if (robot.limelight.tagsWithout3d > 0) {
+      telemetry.addLine("WARNING: " + robot.limelight.tagsWithout3d
+          + " tag(s) without a 3D pose (ignored): turn on Full 3D in this Limelight pipeline");
     }
     telemetry.addData("Turret error", robot.limelight.error);   // a number: plot it in Panels' Graph to tune AIM_*
     telemetry.addData("Pose", "x %.1f  y %.1f  h %.0f deg", p.x(), p.y(), Math.toDegrees(p.heading()));

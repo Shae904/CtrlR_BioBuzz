@@ -33,6 +33,10 @@ public class Limelight {
   public static double AIM_RGB_THRESHOLD = 2;
   /** A Limelight result older than this (ms) is no target (camera stopped sending). */
   public static int STALE_MS = 300;
+  /** Flywheel target before the first tag reading (ticks/s): the auto-corner shot (1.54 m), the formula's ~1140. */
+  public static double DEFAULT_SHOT_TICKS = 1150;
+  /** Teleop pre-aim from odometry: back to the rest direction if no tags are found within this (ms); re-press to retry. */
+  public static int ODOMETRY_PREAIM_TIMEOUT_MS = 1500;
   /** The opening of each RED CELL when it is up (in, Pedro): the teleop pre-aim from odometry; BLUE is rotated. */
   public static double[] OPENING_RED_AUDIENCE_IN = {57.8, 54.8};
   public static double[] OPENING_RED_SCORING_IN = {57.8, 86.25};
@@ -89,7 +93,7 @@ public class Limelight {
 
   private LLResult currentGoal;
 
-  private double lastCalculatedVel = Outtake.medSpeed;
+  private double lastCalculatedVel = DEFAULT_SHOT_TICKS;
   private double aimIntegral = 0;
   private double aimLastError = 0;
 
@@ -116,6 +120,10 @@ public class Limelight {
   private long lastAimCallNs;
   /** Where the turret target came from: REST, VISION, HOLD (tags just lost), ODOMETRY (teleop pre-aim), LAST (autos). */
   private String aimSource = "REST";
+  private boolean wasAiming;
+  private long odometryPreaimSinceNs = -1;   // when this aiming session's odometry pre-aim started (-1: not yet)
+  /** Our tags seen this frame without a 3D pose (ignored: up/down can't be checked); > 0 means Full 3D is off. */
+  public int tagsWithout3d;
 
   public double target;
 
@@ -170,9 +178,14 @@ public class Limelight {
    * that ignores the switch, cannot aim at the other CELL.
    */
   public void targetCell(HiveTargeting.Cell cell) {
+    if (cell != this.targetCell) {
+      tracker.clearFix();                 // the held direction was the other CELL's
+      lastFrameTimestamp = Double.NaN;
+    }
     this.targetCell = cell;
     int pipeline = pipelineFor(currentColor, cell);
     if (pipeline == switchedPipeline) {
+      requestedPipeline = pipeline;       // (a failed switch to another pipeline may have been asked for meanwhile)
       return;
     }
     if (pipeline != requestedPipeline || pipelineRetry.milliseconds() >= PIPELINE_RETRY_MS) {
@@ -205,10 +218,12 @@ public class Limelight {
    * upward-facing CELL (the higher cluster) and aims from the measured tag positions (AimGeometry): each tag's
    * horizontal bearing and range, its place in the row, the opening in front of the cluster, the camera beside the
    * shot line. Angles are taken without the Limelight crosshair, so a crosshair set in a pipeline changes nothing.
+   * Only tags with a 3D pose count: the pose's height tells the up CELL from the down one (no 3D: tagsWithout3d).
    */
   private void updateHiveTarget() {
     this.hiveSeen = false;
     this.hiveTagCount = 0;
+    this.tagsWithout3d = 0;
     if (currentGoal == null || !currentGoal.isValid()) {
       return;
     }
@@ -217,9 +232,7 @@ public class Limelight {
       cluster.clear();
     }
     double[] sumHeight = new double[4];
-    double[] sumTy = new double[4];
     int[] count = new int[4];
-    int[] count3d = new int[4];
     int onlyCell = targetCell == null ? -1 : cellIndex(currentColor, targetCell);
     for (FiducialResult tag : currentGoal.getFiducialResults()) {
       int id = tag.getFiducialId();
@@ -235,53 +248,35 @@ public class Limelight {
       double tanTx = Math.tan(Math.toRadians(tag.getTargetXDegreesNoCrosshair()));
       double tanTy = Math.tan(Math.toRadians(tag.getTargetYDegreesNoCrosshair()));
       double rayFwd = Math.cos(pitch) - tanTy * Math.sin(pitch);
-      double rayUp = Math.sin(pitch) + tanTy * Math.cos(pitch);
-      double rayHoriz = Math.hypot(tanTx, rayFwd);
       // Horizontal bearing in the level frame (+ = right)
       double bearing = Math.atan2(tanTx, rayFwd);
-      double dist = Double.NaN;
       Pose3D pose = tag.getTargetPoseCameraSpace();
-      if (pose != null) {
-        Position p = pose.getPosition().toUnit(DistanceUnit.METER);
-        if (p.z > 0.05) {
-          double fwd = p.z * Math.cos(pitch) + p.y * Math.sin(pitch);
-          double up = p.z * Math.sin(pitch) - p.y * Math.cos(pitch);
-          dist = Math.hypot(p.x, fwd);
-          sumHeight[cell] += LENS_HEIGHT_M + up;
-          count3d[cell]++;
-        }
+      Position p = pose == null ? null : pose.getPosition().toUnit(DistanceUnit.METER);
+      if (p == null || p.z <= 0.05) {
+        tagsWithout3d++;                  // no 3D pose: can't tell an up CELL from a down one, so not used
+        continue;
       }
-      if (Double.isNaN(dist)) { // no 3D pose: assume this cluster is on the upward CELL
-        if (rayUp <= 0.01) {
-          continue;
-        }
-        dist = (UP_CELL_TAG_HEIGHT_M - LENS_HEIGHT_M) * rayHoriz / rayUp;
-      }
-      clusters[cell].add((id - 30) % 4, bearing, dist);
-      sumTy[cell] += tanTy;
+      double fwd = p.z * Math.cos(pitch) + p.y * Math.sin(pitch);
+      double up = p.z * Math.sin(pitch) - p.y * Math.cos(pitch);
+      sumHeight[cell] += LENS_HEIGHT_M + up;
+      clusters[cell].add((id - 30) % 4, bearing, Math.hypot(p.x, fwd));
       count[cell]++;
     }
 
-    // Upward-facing CELL = the higher cluster (measured height when 3D is available, else larger ty)
+    // Upward-facing CELL = the higher cluster, measured from the 3D poses (a down CELL is never a target)
     double midHeight = (UP_CELL_TAG_HEIGHT_M + DOWN_CELL_TAG_HEIGHT_M) / 2.0;
     int best = -1;
-    double bestScore = Double.NEGATIVE_INFINITY;
+    double bestHeight = Double.NEGATIVE_INFINITY;
     for (int c = 0; c < 4; c++) {
       if (count[c] == 0) {
         continue;
       }
-      double score;
-      if (count3d[c] > 0) {
-        double height = sumHeight[c] / count3d[c];
-        if (height < midHeight) {
-          continue; // this CELL faces down: not a scoring target
-        }
-        score = 1000 + height;
-      } else {
-        score = sumTy[c] / count[c];
+      double height = sumHeight[c] / count[c];
+      if (height < midHeight) {
+        continue; // this CELL faces down: not a scoring target
       }
-      if (score > bestScore) {
-        bestScore = score;
+      if (height > bestHeight) {
+        bestHeight = height;
         best = c;
       }
     }
@@ -345,11 +340,11 @@ public class Limelight {
     // Update Velocities and Angles (robot frame: x to the right, y forward, m/s)
     double xVelocity = -robotTwist.vy * 0.0254;
     double yVelocity = robotTwist.vx * 0.0254;
-    double txRad = Math.toRadians(this.aimCorrection);
-
-    double turretRad = Math.toRadians(turretPosition + 180);
-    // Total angle = turret heading + tx offset from turret center
-    double totalAngleRad = turretRad + txRad;
+    // Line of sight to the opening, as a turret position: the held aim when there is one (not the turret now + a
+    // turn measured from where the turret was when the frame was taken)
+    double lineOfSight = tracker.hasRecentFix(now) ? tracker.targetFromField(headingDeg)
+        : turretPosition + this.aimCorrection;
+    double totalAngleRad = Math.toRadians(lineOfSight + 180);
 
     this.vPerpendicular = xVelocity * Math.cos(totalAngleRad)
         - yVelocity * Math.sin(totalAngleRad);
@@ -402,27 +397,43 @@ public class Limelight {
   public void updateTarget(double turretPos, boolean shouldAim, AllianceColor color) {
     long now = System.nanoTime();
     this.turretPosition = turretPos + color.getSteadyState();
+    if (shouldAim && !wasAiming) {
+      odometryPreaimSinceNs = -1;         // a new press: the odometry pre-aim may try again
+    }
+    wasAiming = shouldAim;
 
     if (!shouldAim) {
       target = color.getSteadyState();
       aimSource = "REST";
     } else if (tracker.hasRecentFix(now)) {
+      odometryPreaimSinceNs = -1;         // tags seen: a later pre-aim gets its full time again
       target = tracker.targetFromField(headingDeg);
       aimSource = this.hasValidTarget() ? "VISION" : "HOLD";
       if (this.hasValidTarget()) {
         lastTarget = target;
       }
-    } else if (targetCell != null) {
+    } else if (targetCell != null && preaimAllowed(now)) {
       double[] opening = openingIn(color, targetCell);
       target = TurretTracker.targetFromBearing(headingDeg,
           TurretTracker.openingBearingDeg(robotXIn, robotYIn, Math.toRadians(headingDeg), opening[0], opening[1]));
       aimSource = "ODOMETRY";
+    } else if (targetCell != null) {
+      target = color.getSteadyState();    // odometry pre-aim found nothing: rest, as before (re-press RB to retry)
+      aimSource = "REST-SEARCH";
     } else {
       target = lastTarget;
       aimSource = "LAST";
     }
     target = TurretTracker.limit(target, this.turretPosition);
     error = target - this.turretPosition;
+  }
+
+  /** Odometry pre-aim allowed: within ODOMETRY_PREAIM_TIMEOUT_MS of its start in this press (a fix restarts it). */
+  private boolean preaimAllowed(long now) {
+    if (odometryPreaimSinceNs < 0) {
+      odometryPreaimSinceNs = now;
+    }
+    return now - odometryPreaimSinceNs <= ODOMETRY_PREAIM_TIMEOUT_MS * 1_000_000L;
   }
 
   /** The opening of {@code color}'s {@code cell} when it is up (in, Pedro); BLUE's is RED's rotated about the centre. */
@@ -436,7 +447,7 @@ public class Limelight {
     return new double[]{HiveTargeting.FIELD_IN - other[0], HiveTargeting.FIELD_IN - other[1]};
   }
 
-  /** Where the turret target comes from now: REST, VISION, HOLD, ODOMETRY or LAST. */
+  /** Where the turret target comes from now: REST, VISION, HOLD, ODOMETRY, REST-SEARCH (pre-aim gave up) or LAST. */
   public String aimSource() {
     return aimSource;
   }
@@ -456,8 +467,11 @@ public class Limelight {
 
 
   public double updateAimPID() { // returns the turn power from pid for autoaiming
-    double dt = aimTimer.seconds();
+    double dt = Math.min(aimTimer.seconds(), 0.1);   // the first call comes after the whole INIT wait
     aimTimer.reset();
+    if ("REST".equals(aimSource)) {
+      aimIntegral = 0;                                // no windup while resting
+    }
 
     // Integral
     aimIntegral += error * dt;
@@ -481,8 +495,10 @@ public class Limelight {
       rgb.setPosition(0);
     }
 
-    // The target moves with the robot's heading (field-held): feed that rate forward
-    double feedForward = "REST".equals(aimSource) ? 0 : AIM_Kv * yawRateDegS;
+    // The target moves with the robot's heading when it is held on the field: feed that rate forward (not for the
+    // rest direction or the autos' robot-relative pre-aim, which turn with the robot)
+    boolean fieldHeld = "VISION".equals(aimSource) || "HOLD".equals(aimSource) || "ODOMETRY".equals(aimSource);
+    double feedForward = fieldHeld ? AIM_Kv * yawRateDegS : 0;
 
     // PID Output
     if (Math.abs(error) < AIM_DEADBAND) {

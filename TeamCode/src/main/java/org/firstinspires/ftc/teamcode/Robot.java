@@ -148,10 +148,9 @@ public class Robot {
    */
   public void updateAimingSystem(boolean shouldAim) {
     double turretPosition = this.outtake.getTurretPosDegrees();
-    if (shouldAim) {
-      // Pedro's robot-frame velocity (in/s forward, in/s left, rad/s) and pose
-      this.limelight.updateAim(this.follower.pose(), this.follower.twist(), turretPosition);
-    }
+    // Every loop, aiming or not: the turret/heading history for the camera delay, and a held aim ready when RB goes down
+    // (Pedro's robot-frame velocity: in/s forward, in/s left, rad/s)
+    this.limelight.updateAim(this.follower.pose(), this.follower.twist(), turretPosition);
     this.limelight.updateTarget(turretPosition, shouldAim, this.getAllianceColor());
     this.outtake.setPowerTurret(this.limelight.updateAimPID());
   }

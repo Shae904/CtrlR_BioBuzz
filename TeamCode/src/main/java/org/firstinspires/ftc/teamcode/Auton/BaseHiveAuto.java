@@ -180,9 +180,7 @@ public abstract class BaseHiveAuto {
    */
   private void aim() {
     double turret = robot.outtake.getTurretPosDegrees();
-    if (aiming) {
-      robot.limelight.updateAim(robot.follower.pose(), robot.follower.twist(), turret);
-    }
+    robot.limelight.updateAim(robot.follower.pose(), robot.follower.twist(), turret);   // every loop (camera-delay history)
     robot.limelight.updateTarget(turret, aiming, robot.getAllianceColor());
     robot.outtake.setPowerTurret(robot.limelight.updateAimPID());
   }
