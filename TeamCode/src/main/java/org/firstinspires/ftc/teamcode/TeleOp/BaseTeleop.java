@@ -181,6 +181,12 @@ public class BaseTeleop {
     telemetry.addData("Target CELL", "%s %s, pipeline %d (%s)", robot.getAllianceColor(), targeting.cell(), requested,
         targeting.isAuto() ? "auto" : "manual until the " + targeting.cell().name().toLowerCase() + " tiles");
     telemetry.addData("Zone", "%s (y %.1f in)", targeting.zone(), p.y());
+    if (robot.limelight.hasValidTarget()) {
+      telemetry.addData("Aim", "%d tags, turn %+.1f deg, opening %.2f m", robot.limelight.hiveTagCount,
+          robot.limelight.aimCorrectionDeg(), robot.limelight.distance);
+    } else {
+      telemetry.addData("Aim", "no tags of the target CELL");
+    }
     telemetry.addData("Pose", "x %.1f  y %.1f  h %.0f deg", p.x(), p.y(), Math.toDegrees(p.heading()));
     telemetry.addData("Pose from", "%s  (gp2 square = reset y at the audience wall)", poseSource);
     if (running == requested || running < 0) {

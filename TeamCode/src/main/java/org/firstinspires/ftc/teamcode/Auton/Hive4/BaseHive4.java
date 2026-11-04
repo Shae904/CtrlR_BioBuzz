@@ -26,15 +26,6 @@ public class BaseHive4 extends BaseHiveAuto {
 
   public static double[] PARK_RED = {14.0, 106.0, 90};
 
-  /**
-   * The tags' mean tx (deg) at which the shooter points at the CELL opening from the shooting spot: the camera sits
-   * 82 mm right of the shot line and, 47 deg off the CELL's axis, the tag cluster (73 mm deeper than the opening)
-   * appears beside it. In the simulator it is -4.5 for both alliances; the teleop's AllianceColor.getAimPose() is -5 (RED) /
-   * -1 (BLUE), so this auto trims the team's Limelight aim by (getAimPose - AIM_TX_DEG). Tune on the robot from the
-   * first shot's miss.
-   */
-  public static double AIM_TX_DEG = -4.5;
-
   public BaseHive4(LinearOpMode opMode, Robot robot) {
     super(opMode, robot);
   }
@@ -45,7 +36,6 @@ public class BaseHive4 extends BaseHiveAuto {
       return;
     }
     Pose cell = fieldPose(CELL_RED);
-    setAimPoint(AIM_TX_DEG);
 
     // --- drive out and line up ---
     phase = "DRIVE";

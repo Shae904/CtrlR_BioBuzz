@@ -33,9 +33,9 @@ public class Limelight {
   public static double CAM_PITCH_DEG = 35.0;           // Limelight lens axis above horizontal (ghettoturret v10 CAD)
   public static double UP_CELL_TAG_HEIGHT_M = 1.261;   // tag cluster height when its CELL faces up (the scoring target)
   public static double DOWN_CELL_TAG_HEIGHT_M = 0.905; // tag cluster height when its CELL faces down
-  // CELL opening centre vs its tag cluster, horizontally (field STEP): the opening is at the outer, raised end of the
-  // CELL and faces the same side as the tags, so it is 73 mm NEARER than the tags (negative).
-  public static double OPENING_BEYOND_TAGS_M = -0.073;
+  // The CELL opening vs its tags and the camera vs the shot line: AimGeometry (the aim and the formula's distance).
+  /** Aim trim (deg, + = right) on top of the geometry: one number for a camera yaw error or a sideways throw. */
+  public static double AIM_TRIM_DEG = 0;
 
   // --- Shot formula from the CAD + physics model (vibecadded-ftc/shooter-model/DERIVATION.md) ---
   // ticks/s = d * (SHOT_A * d - SHOT_B)^-0.5 / SHOT_K + SHOT_OFFSET, d = horizontal camera -> CELL opening (m)
@@ -85,11 +85,14 @@ public class Limelight {
   private double vPerpendicular;
   private double vParallel;
 
-  // Result of the multi-tag hive detection (see updateAim)
+  // Result of the multi-tag hive detection (see updateHiveTarget)
   private boolean hiveSeen = false;
-  private double aimTx = 0;          // mean tx of the upward CELL's visible tags (deg)
-  public double tagDistance;         // horizontal camera -> tag cluster (m)
+  private double aimCorrection = 0;  // turret turn that puts the shot line through the opening (deg, + = right)
+  public double tagDistance;         // horizontal camera -> tag cluster centre (m)
   public int hiveTagCount;           // how many of our hive's tags were used
+  private double cameraYawRad;       // the camera's (= shot line's) field heading: robot heading + turret angle
+  private final AimGeometry.Cluster[] clusters = {
+      new AimGeometry.Cluster(), new AimGeometry.Cluster(), new AimGeometry.Cluster(), new AimGeometry.Cluster()};
 
   public double target;
 
@@ -176,7 +179,9 @@ public class Limelight {
 
   /**
    * Uses every visible tag of our HIVE (not just the Limelight's primary target): groups them by CELL, picks the
-   * upward-facing CELL (the higher cluster) and averages distance and tx over all of its visible tags.
+   * upward-facing CELL (the higher cluster) and aims from the measured tag positions (AimGeometry): each tag's
+   * horizontal bearing and range, its place in the row, the opening in front of the cluster, the camera beside the
+   * shot line. Angles are taken without the Limelight crosshair, so a crosshair set in a pipeline changes nothing.
    */
   private void updateHiveTarget() {
     this.hiveSeen = false;
@@ -185,8 +190,9 @@ public class Limelight {
       return;
     }
     double pitch = Math.toRadians(CAM_PITCH_DEG);
-    double[] sumDist = new double[4];
-    double[] sumTx = new double[4];
+    for (AimGeometry.Cluster cluster : clusters) {
+      cluster.clear();
+    }
     double[] sumHeight = new double[4];
     double[] sumTy = new double[4];
     int[] count = new int[4];
@@ -202,14 +208,14 @@ public class Limelight {
         continue; // not the CELL the TELEOP targets
       }
       // Ray to the tag, rotated from the tilted camera into a level frame
-      // (camera space: +x right, +y down, +z out of the lens; tx/ty are pinhole angles)
-      double tanTx = Math.tan(Math.toRadians(tag.getTargetXDegrees()));
-      double tanTy = Math.tan(Math.toRadians(tag.getTargetYDegrees()));
+      // (camera space: +x right, +y down, +z out of the lens; tx/ty are pinhole angles from the optical axis)
+      double tanTx = Math.tan(Math.toRadians(tag.getTargetXDegreesNoCrosshair()));
+      double tanTy = Math.tan(Math.toRadians(tag.getTargetYDegreesNoCrosshair()));
       double rayFwd = Math.cos(pitch) - tanTy * Math.sin(pitch);
       double rayUp = Math.sin(pitch) + tanTy * Math.cos(pitch);
       double rayHoriz = Math.hypot(tanTx, rayFwd);
-      // True horizontal bearing (what tx meant when the camera was level, so aim tuning still applies)
-      double bearing = Math.toDegrees(Math.atan2(tanTx, rayFwd));
+      // Horizontal bearing in the level frame (+ = right)
+      double bearing = Math.atan2(tanTx, rayFwd);
       double dist = Double.NaN;
       Pose3D pose = tag.getTargetPoseCameraSpace();
       if (pose != null) {
@@ -228,9 +234,8 @@ public class Limelight {
         }
         dist = (UP_CELL_TAG_HEIGHT_M - LENS_HEIGHT_M) * rayHoriz / rayUp;
       }
-      sumDist[cell] += dist;
-      sumTx[cell] += bearing;
-      sumTy[cell] += tag.getTargetYDegrees();
+      clusters[cell].add((id - 30) % 4, bearing, dist);
+      sumTy[cell] += tanTy;
       count[cell]++;
     }
 
@@ -260,21 +265,34 @@ public class Limelight {
     if (best < 0) {
       return;
     }
+    // CELLS 1 (red, 34-37) and 2 (blue, 38-41) face the audience wall; 0 (30-33) and 3 (42-45) the far wall
+    AimGeometry.Aim aim = AimGeometry.solve(clusters[best], best == 1 || best == 2, cameraYawRad);
     this.hiveSeen = true;
     this.hiveTagCount = count[best];
-    this.tagDistance = sumDist[best] / count[best];
-    this.aimTx = sumTx[best] / count[best];
-    // The opening faces the same side as the tags and sits 73 mm nearer (OPENING_BEYOND_TAGS_M < 0)
-    this.distance = this.tagDistance + OPENING_BEYOND_TAGS_M;
+    this.tagDistance = aim.tagDistanceM;
+    this.aimCorrection = aim.correctionDeg;
+    this.distance = aim.formulaDistanceM;
   }
 
-  public void updateAim(double xVelocity, double yVelocity) {
+  /** The turret turn (deg, + = right) the last frame asked for, before the trim and the lead. */
+  public double aimCorrectionDeg() {
+    return aimCorrection;
+  }
+
+  /**
+   * @param xVelocity       robot velocity to its right (m/s)
+   * @param yVelocity       robot velocity forward (m/s)
+   * @param robotHeadingRad the robot's field heading (Pedro, CCW): with the turret angle, the camera's field heading
+   */
+  public void updateAim(double xVelocity, double yVelocity, double robotHeadingRad) {
+    // Turret position: 180 = shooting forward, 90 = left (CW +), so the shot line is (180 - position) CCW of forward
+    this.cameraYawRad = robotHeadingRad + Math.toRadians(180 - turretPosition);
     // Update goal
     this.currentGoal = this.limelight.getLatestResult();
     this.updateHiveTarget();
 
     // Update Velocities and Angles
-    double txRad = Math.toRadians(this.aimTx);
+    double txRad = Math.toRadians(this.aimCorrection);
 
     double turretRad = Math.toRadians(turretPosition + 180);
     // Total angle = turret heading + tx offset from turret center
@@ -311,7 +329,7 @@ public class Limelight {
   }
 
   public double calculateError() {
-    return this.aimTx - (currentColor.getAimPose() + this.calculateLeadAngleDegrees());
+    return this.aimCorrection + AIM_TRIM_DEG - this.calculateLeadAngleDegrees();
   }
 
   public boolean hasValidTarget() {

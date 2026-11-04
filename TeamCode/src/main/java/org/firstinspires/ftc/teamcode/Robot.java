@@ -148,8 +148,8 @@ public class Robot {
       // Robot-frame velocity (in/s): vx = forward, vy = left. Same as 2.x getVelocity().rotateVector(-getHeading()).
       Twist botVelocity = this.follower.twist();
       this.limelight.updateAim(((-botVelocity.vy * 2.54) / 100.0),
-          (botVelocity.vx * 2.54)
-              / 100.0); // Getting velocities in inches / sec and converting to meters / sec
+          (botVelocity.vx * 2.54) / 100.0, // Getting velocities in inches / sec and converting to meters / sec
+          this.follower.pose().heading());
     }
     // Update PID while not auto aiming
     double turretPosition = this.outtake.getTurretPosDegrees();

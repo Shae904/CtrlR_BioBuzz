@@ -18,11 +18,11 @@ import org.firstinspires.ftc.teamcode.Subsystems.Intake;
 
 /**
  * What the BIOBUZZ autonomous routines ({@link BaseHive4}, {@link BaseTwoTip}) share: alliance poses, driving with a
- * timeout, the team's Limelight turret aim with that spot's aim point, and shooting through the gate.
+ * timeout, the team's Limelight turret aim (the shot line through the CELL opening from the measured tags, see
+ * Subsystems.AimGeometry; a constant sideways miss is Limelight.AIM_TRIM_DEG), and shooting through the gate.
  *
  * <p>Written and tested in the biobuzz-sim simulator (it runs this TeamCode unchanged). The numbers that came from the
- * simulator and need checking on the real robot: the aim points (BaseHive4.AIM_TX_DEG, BaseTwoTip.AIM_TX_A_DEG /
- * AIM_TX_B_DEG: tune from where the first shot lands), the feed timing (FEED_FIRST_MS, FEED_INTERVAL_MS,
+ * simulator and need checking on the real robot: the feed timing (FEED_FIRST_MS, FEED_INTERVAL_MS,
  * FEED_MARGIN_MS: how long the intake must run for exactly one ball to reach the flywheel) and the GARDEN sweep /
  * flower pickup in BaseTwoTip. All of them are @Configurable (Panels).
  *
@@ -49,7 +49,7 @@ public abstract class BaseHiveAuto {
   /** Flywheel target while driving (ticks/s), until the Limelight gives the formula's (~1140 at the shooting spots). */
   public static double SPINUP_TICKS = 1150;
   /**
-   * Ready to shoot: turret within this of the tags' aim point (deg) and the flywheel within this of its target, held
+   * Ready to shoot: turret within this of its aim (deg) and the flywheel within this of its target, held
    * for READY_HOLD_MS, so a turret swinging through the aim point is not ready. The CELL opening is ~20 in wide and 2
    * deg is 5 cm at 1.45 m; in the simulator the aim PID hunts about +-1.3 deg, so 1 deg made every ball wait ~1 s.
    */
@@ -79,7 +79,6 @@ public abstract class BaseHiveAuto {
   protected final Robot robot;
   protected final Telemetry telemetry;
   protected String phase = "INIT";
-  private double aimTxDeg;
   private boolean aiming = true;
   private boolean readyNow;
   private final ElapsedTime readyFor = new ElapsedTime();
@@ -138,11 +137,6 @@ public abstract class BaseHiveAuto {
 
   // ---- the loop ----------------------------------------------------------------------------------------------------
 
-  /** The tags' tx (deg) at which the shot goes into the CELL from the next shooting spot. */
-  protected void setAimPoint(double aimTxDeg) {
-    this.aimTxDeg = aimTxDeg;
-  }
-
   /** Done shooting: the turret goes back to its rest direction (the team's updateTarget without aim) and the flywheel stops. */
   protected void stopAiming() {
     aiming = false;
@@ -182,20 +176,15 @@ public abstract class BaseHiveAuto {
   }
 
   /**
-   * The team's Limelight turret aim (Robot.updateAimingSystem) with this spot's aim point: once the CELL's tags are
-   * seen the target is trimmed by (getAimPose - aimTxDeg); before that the turret holds the pre-aim set in update().
+   * The team's Limelight turret aim (as Robot.updateAimingSystem): once the CELL's tags are seen the shot line goes
+   * through its opening (AimGeometry); before that the turret holds the pre-aim set in update().
    */
   private void aim() {
     if (aiming) {
       Twist v = robot.follower.twist();
-      robot.limelight.updateAim((-v.vy * 2.54) / 100.0, (v.vx * 2.54) / 100.0);
+      robot.limelight.updateAim((-v.vy * 2.54) / 100.0, (v.vx * 2.54) / 100.0, robot.follower.pose().heading());
     }
     robot.limelight.updateTarget(robot.outtake.getTurretPosDegrees(), aiming, robot.getAllianceColor());
-    if (aiming && robot.limelight.hasValidTarget()) {
-      double trim = robot.getAllianceColor().getAimPose() - aimTxDeg;
-      robot.limelight.target += trim;
-      robot.limelight.error += trim;
-    }
     robot.outtake.setPowerTurret(robot.limelight.updateAimPID());
   }
 
@@ -237,7 +226,7 @@ public abstract class BaseHiveAuto {
     }
   }
 
-  /** Waits for the turret on the tags' aim point and the flywheel at speed; false when it gave up after {@code timeoutMs}. */
+  /** Waits for the turret on its aim and the flywheel at speed; false when it gave up after {@code timeoutMs}. */
   protected boolean aimUntilReady(int timeoutMs) {
     ElapsedTime timer = new ElapsedTime();
     while (opMode.opModeIsActive() && timer.milliseconds() < timeoutMs && !readyToShoot()) {

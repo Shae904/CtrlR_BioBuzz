@@ -35,8 +35,6 @@ public class BaseTwoTip extends BaseHiveAuto {
   public static double[] SHOOT_A_RED = {16.5, 16.5};
   /** RED audience CELL opening, x in, y in (up at the start). */
   public static double[] CELL_A_RED = {57.8, 54.8};
-  /** Tags' tx (deg) at which the shot goes into the audience CELL from SHOOT_A (see BaseHive4.AIM_TX_DEG). */
-  public static double AIM_TX_A_DEG = -4.5;
 
   /**
    * RED GARDEN sweep, x in, y in, heading deg: turn with room to spare from the wall, slide down to it, then sweep
@@ -61,8 +59,6 @@ public class BaseTwoTip extends BaseHiveAuto {
   public static double[] SHOOT_B_RED = {15.5, 125.9};
   /** RED scoring CELL opening, x in, y in (up after the first tip, facing the rear). */
   public static double[] CELL_B_RED = {57.8, 86.25};
-  /** Tags' tx (deg) at which the shot goes into the scoring CELL from SHOOT_B: the tags appear on the other side here. */
-  public static double AIM_TX_B_DEG = -1.0;
 
   /**
    * RED rear flower (column x 47.13, plate face 4.89 in off the rear wall): in front of it, then the front 0.1 in short
@@ -102,7 +98,6 @@ public class BaseTwoTip extends BaseHiveAuto {
 
     // --- 1. out, line up at the audience CELL, shoot 3: the third tips the HIVE ---
     phase = "DRIVE A";
-    setAimPoint(AIM_TX_A_DEG);
     robot.outtake.setTargetVelocity(SPINUP_TICKS);
     driveTo(Paths.path(Paths.line(start, out).constant(start.heading()), Paths.line(out, shootA).linear(out, shootA)),
         DRIVE_TIMEOUT_MS);
@@ -113,7 +108,6 @@ public class BaseTwoTip extends BaseHiveAuto {
 
     // --- 2. the GARDEN: 3 POLLEN fill the hopper ---
     phase = "GARDEN";
-    setAimPoint(AIM_TX_B_DEG);
     drive(Paths.path(Paths.line(shootA, gardenTurn).linear(shootA, gardenTurn),
         Paths.line(gardenTurn, gardenWall).constant(gardenTurn.heading())), DRIVE_TIMEOUT_MS);
     intake(true);

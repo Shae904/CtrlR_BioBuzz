@@ -9,11 +9,6 @@ public enum AllianceColor {
     }
 
     @Override
-    public int getAimPose() {
-      return -5;
-    } //-3
-
-    @Override
     public double getSteadyState() {
       return 90.0;
     }
@@ -29,11 +24,6 @@ public enum AllianceColor {
     }
 
     @Override
-    public int getAimPose() {
-      return -1;
-    } //-2
-
-    @Override
     public double getSteadyState() {
       return 270.0;
     }
@@ -45,8 +35,6 @@ public enum AllianceColor {
    * and then switches to one CELL's pipeline (Limelight.PIPELINE_*, HiveTargeting).
    */
   public abstract int getLLPipelineTeleOP();
-
-  public abstract int getAimPose();
 
   public abstract double getSteadyState();
 }
