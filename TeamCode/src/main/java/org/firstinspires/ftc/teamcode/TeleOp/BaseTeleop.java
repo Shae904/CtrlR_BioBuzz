@@ -28,7 +28,7 @@ public class BaseTeleop {
   public static double SPEED_TRIM_STEP = 10;
   public static double AIM_TRIM_STEP = 0.5;
 
-  /** Which CELL the Limelight targets: gamepad2 X = AUDIENCE, B = SCORING (Xbox layout); no automatic switching. */
+  /** Which CELL the Limelight targets: gamepad2 square (Xbox X) = AUDIENCE, circle (Xbox B) = SCORING; no auto switching. */
   private HiveTargeting.Cell cell;
   private String poseSource = "";
   private final ElapsedTime pipelineMismatch = new ElapsedTime();
@@ -54,7 +54,7 @@ public class BaseTeleop {
       poseSource = "no AUTO just before: assumes the AUTO start spot";
     }
     robot.follower.setPose(start);
-    cell = HiveTargeting.initialCell(start.y());   // the side the robot starts on; the drivers switch with X / B
+    cell = HiveTargeting.initialCell(start.y());   // the side the robot starts on; the drivers switch with square / circle
     robot.limelight.targetCell(cell);
 
     // --- INIT LOOP --- (the CELL buttons, the wall reset and the trims work here too)
@@ -148,12 +148,13 @@ public class BaseTeleop {
   }
 
   /**
-   * LIMELIGHT CELL, manual (gamepad2, Xbox layout): X = our AUDIENCE CELL (RED 34-37 / BLUE 38-41, pipeline 5 / 6),
-   * B = our SCORING CELL (RED 30-33 / BLUE 42-45, pipeline 3 / 4). Same buttons for both alliances.
+   * LIMELIGHT CELL, manual (gamepad2): square (Xbox X) = our AUDIENCE CELL (RED 34-37 / BLUE 38-41, pipeline 5 / 6),
+   * circle (Xbox B) = our SCORING CELL (RED 30-33 / BLUE 42-45, pipeline 3 / 4). Same buttons for both alliances. The
+   * SDK sets the PS and Xbox names from the same physical button, so this works on either controller.
    */
   private void updateCellTarget() {
-    boolean audience = this.opMode.gamepad2.xWasPressed();
-    boolean scoring = this.opMode.gamepad2.bWasPressed();
+    boolean audience = this.opMode.gamepad2.squareWasPressed();
+    boolean scoring = this.opMode.gamepad2.circleWasPressed();
     if (audience) {
       cell = HiveTargeting.Cell.AUDIENCE;
     } else if (scoring) {
@@ -215,7 +216,7 @@ public class BaseTeleop {
     Pose p = robot.follower.pose();
     int requested = robot.limelight.requestedPipeline();
     int running = robot.limelight.runningPipeline();
-    telemetry.addData("Target CELL", "%s %s, pipeline %d  (gp2 X = audience, B = scoring)", robot.getAllianceColor(),
+    telemetry.addData("Target CELL", "%s %s, pipeline %d  (gp2 square/X = audience, circle/B = scoring)", robot.getAllianceColor(),
         cell, requested);
     telemetry.addData("Trims", "speed %+.0f ticks/s (gp2 dpad up/down), aim %+.1f deg (dpad right/left)%s",
         Limelight.SHOT_TRIM_TICKS, Limelight.AIM_TRIM_DEG, Limelight.SHOT_MODEL_58_DEG ? ", 58 deg model" : "");
