@@ -5,7 +5,7 @@ did most of the code since the Pedro 3 upgrade. Treat it as a coworker's notes: 
 not rules. Keep it current: when you change something it describes, change it here too, and add a line to the log at
 the bottom.
 
-Everything below is in the state of CtrlR_BioBuzz `master` at `c605c7c` (PR #14) unless it says otherwise.
+Kept current through PR #18 (2026-11-04) unless a section says otherwise.
 
 ---
 
@@ -56,11 +56,11 @@ inches, origin at the red/audience corner, x toward blue, y toward the rear wall
 
 **Limelight 3A** (on the turret, `LIMELIGHT3ACAD_STEP (2):3`)
 - Lens 64.4 mm behind the turret axis, 81.5 mm right of the shot line, **441 mm above the floor, pitched 35° up**, yaw 0 (looks along the shot). Housing is mounted inverted relative to the STEP's native orientation.
-- Pipelines: **1 = RED** (tags 30–37), **2 = BLUE** (38–45), AprilTag 36h11, **marker size 82.55 mm** (3.25 in), Full 3D on, 640×480. Set up on 10-19; detector downscale should be 1 and quality threshold ≈1.5 if tags flicker. **Click "Stop Ignoring NetworkTables Index"** in the LL web UI or the robot's pipeline switch is ignored.
+- Pipelines: **1 = RED** (both red cells, tags 30–37), **2 = BLUE** (38–45): the autos run on these. Per-cell pipelines (team, 2026-11): **3 = RED SCORING** (30–33), **4 = BLUE SCORING** (42–45), **5 = RED AUDIENCE** (34–37), **6 = BLUE AUDIENCE** (38–41); the teleop switches between them (§7), numbers in `Limelight.PIPELINE_*`. AprilTag 36h11, **marker size 82.55 mm** (3.25 in), Full 3D on, 640×480; detector downscale should be 1 and quality threshold ≈1.5 if tags flicker. **Click "Stop Ignoring NetworkTables Index"** in the LL web UI or the robot's pipeline switch is ignored (the teleop warns when the LL stays on another pipeline for >1 s).
 
 **Intake / hopper**
 - Front roller of 9 compliant wheels (Ø48), axis 217 mm ahead of centre, 90 mm above the floor, 306 mm wide. Only POLLEN (2.8 in) fits the 80 mm channel; NECTAR (3.6 in) does not. Hopper holds 4 (the preload count). Motor `intake` REVERSE, `POWER_INTAKE = 1`.
-- Gate ("slapper", added to the robot 2026-10-22): servo `flapper`, driven by `Intake.setFlapper(boolean up)`. **Starts DOWN** (shut: the hopper holds balls while intaking) at construction and at INIT; **UP** (open: balls feed into the flywheel) only while triangle is held in teleop, or while an auto shoots. Positions measured on the slapper 2026-10-22: `Intake.FLAPPER_UP 0.27` / `FLAPPER_DOWN 0.1` (CommanderSleepy). The autos open it only for a volley (`shoot(n)` / `shootVolley()`), down while driving and intaking; the timing constants `GATE_OPEN_MS 200` (servo travel before the intake starts) and `FEED_FIRST_MS 150` / `FEED_MARGIN_MS 110` (one intake pulse = one ball) are still sim guesses to check on the robot. The DECODE `cycler` servo and its cycle state machine are gone (PR #16); `Intake` is just the roller motor + the flapper.
+- Gate ("slapper", added to the robot 2026-10-22): servo `flapper`, driven by `Intake.setFlapper(boolean up)`. **Starts DOWN** (shut: the hopper holds balls while intaking) at construction and at INIT; **UP** (open: balls feed into the flywheel) only while triangle is held in teleop, or while an auto shoots. Positions: `Intake.FLAPPER_UP 0.17` / `FLAPPER_DOWN 0.04` (CommanderSleepy, retuned 2026-10-23; first measured 0.27 / 0.1). The autos open it only for a volley (`shoot(n)` / `shootVolley()`), down while driving and intaking; the timing constants `GATE_OPEN_MS 200` (servo travel before the intake starts) and `FEED_FIRST_MS 150` / `FEED_MARGIN_MS 110` (one intake pulse = one ball) are still sim guesses to check on the robot. The DECODE `cycler` servo and its cycle state machine are gone (PR #16); `Intake` is just the roller motor + the flapper.
 - Other servos: `tiltA`/`tiltB` (folded .98/.08, deployed .49/.55), `rgb` (indicator: .5 locked on, .277 not aimed, .611 no target).
 
 **Hardware map names** (all of them): `fl fr bl br flywheel1 flywheel2 turret intake` (motors), `flapper tiltA tiltB rgb` (servos), `imu`, `limelight`, `pinpoint`.
@@ -102,15 +102,19 @@ Every tuner's websocket dropped ~1 s after clicking. The mechanism: the page sen
 ## 6. Autonomous (in `Auton/`, written in the sim, 48 and 20 points there)
 
 - `BaseHiveAuto`: shared toolkit. Alliance poses (`fieldPose`), `drive(path, timeout)` + `driveTo` (a short settle path if Pedro stopped >1 in off), Limelight aim with a per-spot aim point (`setAimPoint`), the turret resting toward where the cell will be while driving (tracking a cell behind the robot by odometry ran it into its ±180° limit), `aimUntilReady` (2° and flywheel within 30 ticks/s, held 80 ms), `shoot(n)` one ball per intake pulse, `shootVolley()`, `stopAiming()` before parking. All `@Configurable`.
-- **HIVE 4** (`Hive4/`): start RED (46, 7.36, 90°) / BLUE (95.05, 133.69, 270°) against the audience/rear wall; out to (46, 22), shooting spot (16.5, 16.5) 1.43 m from the up cell, 47° off its axis; volley of 4. The 3rd pollen tips (3 nectar already in the cell), the 4th spills. 20 + LEAVE.
+- **HIVE 4** (`Hive4/`): start RED (46, 7.36, 90°) / BLUE (95.05, 133.69, 270°) against the audience/rear wall; out to (46, 22), shooting spot **(12, 20)** (CommanderSleepy, comp 1; the sim's was (16.5, 16.5), 1.43 m from the up cell); volley of 4. The 3rd pollen tips (3 nectar already in the cell), the 4th spills; then **parks at (14, 106, 90°)** (comp 1). 20 + LEAVE + PARK.
 - **2 TIP** (`TwoTip/`): same start; shoot 3 → tip; sweep the garden along the audience wall pressed on it (turn at (28, 15), slide to (25, 8.4), sweep to (12.3, 7.0) at 25 in/s) for 3 pollen; curve via (26, 40), (26, 95) to (15.5, 125.9) behind the hive, aim point −1°, shoot 4 into the cell that came up; rear flower (47.5, 117) → (47.5, 126.2) facing it, intake 1 s for its 4 pollen; back to (15.5, 125.9), shoot 4 → second tip (needs 8); park at (17, 106, 90°). 48 points in the sim, both alliances, lockstep and real time.
 - Spin-up target while driving `SPINUP_TICKS = 1150`. The autos open/close the gate through `Intake.setFlapper`.
+- The autos save their Pedro pose every loop (`PoseStorage.saveAutoPose` in `BaseHiveAuto.update`) for the teleop.
+- Limelight in the autos: the alliance pipeline 1/2 (both cells). If you move the autos to per-cell pipelines: HIVE 4 RED shoots the **audience** cell (pipeline 5; it is the red cell that is up at the start), BLUE the **scoring** cell (4); 2 TIP spot B is the other cell (RED 3, BLUE 6).
 - **None of this has run on the real robot yet.** Things to expect to tune: aim points, feed timing (`FEED_FIRST_MS 150`, `FEED_INTERVAL_MS 233`, `FEED_MARGIN_MS 110`), whether the real intake grabs pollen pressed against the wall and out of the flower, Pedro's following accuracy (then the settle thresholds).
 - Shooting geometry limits (from the sim): from closer than ~1.2 m the ball can't climb to the opening (needs ≥0.96 m horizontal at any speed); comfortable 1.3–1.45 m; the speed formula has a singularity below ~1.3 m (`SHOT_A·d − SHOT_B` → 0). From the spilled-pollen pile right under the hive you cannot score: back off to ~1.4 m first.
 
 ## 7. Teleop (`TeleOp/BaseTeleop`, RED/BLUE)
 
-Field-centric drive on gamepad1 left stick, turn right stick (either pad). Left bumper (gp1) resets yaw. **RB (either pad) = auto-aim + auto flywheel speed** from the Limelight. Triangle = flapper open (SHOOT). dpad down (gp1) stops the flywheel; gp2 right/left stick buttons toggle auto speed; with auto off, gp2 dpad up/down/right = far/med/cycle presets, gp2 LB = one formula read. Triggers = intake in/out. gp1 dpad up/left = tilt deployed/folded. Telemetry goes to both the DS and Panels (`Robot` wraps `opMode.telemetry` in Panels' `JoinedTelemetry`, PR #12) so Panels' Graph can plot `Vel Current`, `Vel Target` etc. The Graph plots nothing until you pick series ("All"), one shared y-axis, 75 ms updates.
+Field-centric drive on gamepad1 left stick, turn right stick (either pad). Left bumper (gp1) resets yaw. **RB (either pad) = auto-aim + auto flywheel speed** from the Limelight. Triangle = flapper open (SHOOT). **Cross ✕ = target the AUDIENCE cell, circle ○ = target the SCORING cell** (either pad, short rumble). dpad down (gp1) stops the flywheel; gp2 right/left stick buttons toggle auto speed; with auto off, gp2 dpad up/down/right = far/med/cycle presets, gp2 LB = one formula read. Triggers = intake in/out. gp1 dpad up/left = tilt deployed/folded. Telemetry goes to both the DS and Panels (`Robot` wraps `opMode.telemetry` in Panels' `JoinedTelemetry`, PR #12) so Panels' Graph can plot `Vel Current`, `Vel Target` etc. The Graph plots nothing until you pick series ("All"), one shared y-axis, 75 ms updates.
+
+**Limelight cell targeting** (PR #18, `Subsystems/HiveTargeting` + `PoseStorage`): from the odometry y (Pedro, audience wall y = 0), the robot in the two tile rows along the audience wall (y < 47.0 in) targets our **AUDIENCE** cell, in the two rows along the far wall (y > 94.0 in) our **SCORING** cell; the two middle rows never switch (the last choice holds). A cell's tags face its own side, so that is the only cell you can see from there. Cross/circle switch at once and pause the automatic switching until odometry puts the robot in the outer tiles of the side picked (so a wrong pose cannot keep undoing the driver); both work in INIT too. `Limelight.targetCell` switches the pipeline once per change (retried every 250 ms if it fails) and also ignores the other cell's tag IDs. The target cell can be the one that is DOWN: then there is no aim (correct: you can't score into it), drive to the other side. **Start pose:** Pedro starts every opmode at (0, 0), so the teleop seeds it: the AUTO's last pose if an auto ran ≤ 180 s ago (`PoseStorage.MAX_AGE_S`), used once; otherwise it assumes the robot is at the alliance's AUTO start spot. INIT telemetry shows which ("Start pose"), plus zone, target cell, pipeline, pose.
 
 ## 8. Pitfalls we've hit (so you don't)
 
@@ -121,6 +125,8 @@ Field-centric drive on gamepad1 left stick, turn right stick (either pad). Left 
 - The Limelight web UI "ignores NetworkTables index" while you have a pipeline selected there: click the button or the code can't switch pipelines.
 - Logger Pro angle: the camera must be perpendicular to the shot plane or the angle reads steep.
 - The Pinpoint's IMU calibrates for ~0.25–0.5 s after INIT/reset: keep the robot still.
+- Pedro's pose starts at (0, 0) in every opmode: anything that needs the field position in the teleop needs `PoseStorage` (or a known start spot).
+- An annotation check like `getClass().isAnnotationPresent(Autonomous.class)` inside a subsystem tests the subsystem's own class, never the opmode's: it is always false.
 - Both hives' tags are only visible from the side the up cell faces (down + outward); from behind a hive you see nothing. The autos' shooting headings are chosen so the cell is in the turret's rest direction on arrival.
 
 ## 9. Simulator, briefly (`biobuzz-sim`)
@@ -137,6 +143,9 @@ Ryan Lim (github `inevident`, commits as `inevident <ryanlimpre@gmail.com>`), te
 
 ## Log (newest first; add a line when you change the robot)
 
+- 2026-11-04: PR #18 teleop Limelight cell targeting: odometry zones (outer two tile rows per side) pick pipeline 3/4 (scoring) or 5/6 (audience); cross = audience, circle = scoring (either pad); `PoseStorage` carries the auto's pose into the teleop. Removed `AllianceColor.getLLPipelineAuto()` and the `Limelight` annotation check (it never fired, so the comp 1 autos ran on pipeline 1/2; and RED's value 3 was the wrong cell for HIVE 4). (Claude/Ryan)
+- 2026-10-25: CommanderSleepy "Comp 1 Changes" (e7a94ae): HIVE 4 shooting spot (12, 20) + park (14, 106, 90°); `AllianceColor.getLLPipelineAuto()` RED 3 / BLUE 4 with a check in `Limelight` meant to pick it in autos (never true, see PR #18). Recorded by Claude on review.
+- 2026-10-23: CommanderSleepy retuned the flapper: UP 0.17, DOWN 0.04 (6145e26). Recorded by Claude on review.
 - 2026-10-22: CommanderSleepy tuned the flapper positions on the slapper (UP 0.27, DOWN 0.1; 11068d2). Claude fixed the stale comment + notes (PR #17).
 - 2026-10-22: PR #16 removed the DECODE cycler servo and the cycle state machine (`updateAutoCycle`, `FlapperState`, `CYCLER_LOCKED`); `Intake` = roller + flapper. (Claude/Ryan)
 - 2026-10-22: Flapper logic reworked (PR #15): `Intake.setFlapper(up)`, starts DOWN at construction and INIT, UP only while triangle is held, autos use it; `cycler` optional. Positions still DECODE's 0.1 / 0.35, to be checked on the slapper. (Claude/Ryan)

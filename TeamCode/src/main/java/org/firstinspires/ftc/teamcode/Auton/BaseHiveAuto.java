@@ -10,6 +10,7 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.util.ElapsedTime;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.teamcode.AllianceColor;
+import org.firstinspires.ftc.teamcode.PoseStorage;
 import org.firstinspires.ftc.teamcode.Auton.Hive4.BaseHive4;
 import org.firstinspires.ftc.teamcode.Auton.TwoTip.BaseTwoTip;
 import org.firstinspires.ftc.teamcode.Robot;
@@ -160,6 +161,7 @@ public abstract class BaseHiveAuto {
       robot.limelight.setTarget(robot.getAllianceColor().getSteadyState());
     }
     robot.follower.update();
+    PoseStorage.saveAutoPose(robot.follower.pose());   // the TELEOP starts from here
     robot.outtake.updatePIDControl();
     aim();
     boolean ready = robot.limelight.hasValidTarget()

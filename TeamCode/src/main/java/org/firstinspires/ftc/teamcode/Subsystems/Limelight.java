@@ -4,7 +4,6 @@ import com.bylazar.configurables.annotations.Configurable;
 import com.qualcomm.hardware.limelightvision.LLResult;
 import com.qualcomm.hardware.limelightvision.LLResultTypes.FiducialResult;
 import com.qualcomm.hardware.limelightvision.Limelight3A;
-import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.Servo;
@@ -57,8 +56,22 @@ public class Limelight {
   public static double TOF_B = 1.44;
 
 
+  // --- Per-CELL pipelines (Limelight web UI): each sees one CELL's 4 tags. The TELEOP picks the CELL from odometry
+  //     (HiveTargeting, targetCell); the autos stay on the alliance pipeline (both CELLS, getLLPipelineTeleOP). ---
+  public static int PIPELINE_RED_SCORING = 3;    // tags 30-33: the red CELL facing the far wall
+  public static int PIPELINE_BLUE_SCORING = 4;   // tags 42-45: the blue CELL facing the far wall
+  public static int PIPELINE_RED_AUDIENCE = 5;   // tags 34-37: the red CELL facing the audience wall
+  public static int PIPELINE_BLUE_AUDIENCE = 6;  // tags 38-41: the blue CELL facing the audience wall
+  /** A failed pipeline switch is retried after this long (ms). */
+  public static int PIPELINE_RETRY_MS = 250;
+
   public final Limelight3A limelight;
   private final AllianceColor currentColor;
+  /** The CELL whose tags count, or null for either CELL of our HIVE (the autos). */
+  private HiveTargeting.Cell targetCell;
+  private int requestedPipeline;
+  private int switchedPipeline = -1;
+  private final ElapsedTime pipelineRetry = new ElapsedTime();
   private final ElapsedTime aimTimer = new ElapsedTime();
 
   public final Servo rgb;
@@ -91,10 +104,10 @@ public class Limelight {
     this.currentColor = color;
     this.limelight = hardwareMap.get(Limelight3A.class, "limelight");
     this.limelight.start();
-    if(getClass().isAnnotationPresent(Autonomous.class)){
-      this.limelight.pipelineSwitch(this.currentColor.getLLPipelineAuto());
-    } else {
-      this.limelight.pipelineSwitch(this.currentColor.getLLPipelineTeleOP());
+    // Both CELLS of our HIVE; the TELEOP then narrows it to one CELL (targetCell)
+    this.requestedPipeline = this.currentColor.getLLPipelineTeleOP();
+    if (this.limelight.pipelineSwitch(this.requestedPipeline)) {
+      this.switchedPipeline = this.requestedPipeline;
     }
 
     this.lastTarget = this.currentColor.getSteadyState();
@@ -108,6 +121,53 @@ public class Limelight {
     this.lastTarget = pos;
   }
 
+
+  /** The pipeline that sees only {@code cell} of {@code color}'s HIVE. */
+  public static int pipelineFor(AllianceColor color, HiveTargeting.Cell cell) {
+    if (color == AllianceColor.RED) {
+      return cell == HiveTargeting.Cell.SCORING ? PIPELINE_RED_SCORING : PIPELINE_RED_AUDIENCE;
+    }
+    return cell == HiveTargeting.Cell.SCORING ? PIPELINE_BLUE_SCORING : PIPELINE_BLUE_AUDIENCE;
+  }
+
+  /** The CELL's index (tag id - 30) / 4: 0 red scoring, 1 red audience, 2 blue audience, 3 blue scoring. */
+  static int cellIndex(AllianceColor color, HiveTargeting.Cell cell) {
+    if (color == AllianceColor.RED) {
+      return cell == HiveTargeting.Cell.SCORING ? 0 : 1;
+    }
+    return cell == HiveTargeting.Cell.AUDIENCE ? 2 : 3;
+  }
+
+  /**
+   * Looks at one CELL of our HIVE only: switches the Limelight to that CELL's pipeline (once, retried if the switch
+   * failed) and ignores every other tag, so the frames from the old pipeline right after a switch, or a Limelight
+   * that ignores the switch, cannot aim at the other CELL.
+   */
+  public void targetCell(HiveTargeting.Cell cell) {
+    this.targetCell = cell;
+    int pipeline = pipelineFor(currentColor, cell);
+    if (pipeline == switchedPipeline) {
+      return;
+    }
+    if (pipeline != requestedPipeline || pipelineRetry.milliseconds() >= PIPELINE_RETRY_MS) {
+      requestedPipeline = pipeline;
+      pipelineRetry.reset();
+      if (limelight.pipelineSwitch(pipeline)) {
+        switchedPipeline = pipeline;
+      }
+    }
+  }
+
+  /** The pipeline the code asked for. */
+  public int requestedPipeline() {
+    return requestedPipeline;
+  }
+
+  /** The pipeline the Limelight's latest result came from, or -1 before the first result. */
+  public int runningPipeline() {
+    LLResult result = limelight.getLatestResult();
+    return result == null ? -1 : result.getPipelineIndex();
+  }
 
   /** True if the tag belongs to our alliance's HIVE (both of its CELLS). */
   private static boolean isOurHiveTag(int id, AllianceColor color) {
@@ -131,12 +191,16 @@ public class Limelight {
     double[] sumTy = new double[4];
     int[] count = new int[4];
     int[] count3d = new int[4];
+    int onlyCell = targetCell == null ? -1 : cellIndex(currentColor, targetCell);
     for (FiducialResult tag : currentGoal.getFiducialResults()) {
       int id = tag.getFiducialId();
       if (!isOurHiveTag(id, currentColor)) {
         continue;
       }
       int cell = (id - 30) / 4; // 0: red scoring, 1: red audience, 2: blue audience, 3: blue scoring
+      if (onlyCell >= 0 && cell != onlyCell) {
+        continue; // not the CELL the TELEOP targets
+      }
       // Ray to the tag, rotated from the tilted camera into a level frame
       // (camera space: +x right, +y down, +z out of the lens; tx/ty are pinhole angles)
       double tanTx = Math.tan(Math.toRadians(tag.getTargetXDegrees()));
