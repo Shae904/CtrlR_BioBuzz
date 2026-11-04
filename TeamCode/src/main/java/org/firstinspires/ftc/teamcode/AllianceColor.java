@@ -8,8 +8,6 @@ public enum AllianceColor {
       return 1;
     }
 
-    public int getLLPipelineAuto() { return 3; }
-
     @Override
     public int getAimPose() {
       return -5;
@@ -27,10 +25,8 @@ public enum AllianceColor {
 
     @Override
     public int getLLPipelineTeleOP() {
-      return 2; // TODO: make these in LL
+      return 2;
     }
-
-    public int getLLPipelineAuto() { return 4; }
 
     @Override
     public int getAimPose() {
@@ -44,9 +40,11 @@ public enum AllianceColor {
 
   };
 
+  /**
+   * The alliance pipeline: both CELLS of our HIVE (tags 30-37 / 38-45). The autos run on it; the TELEOP starts on it
+   * and then switches to one CELL's pipeline (Limelight.PIPELINE_*, HiveTargeting).
+   */
   public abstract int getLLPipelineTeleOP();
-
-  public abstract  int getLLPipelineAuto();
 
   public abstract int getAimPose();
 
