@@ -38,6 +38,10 @@ public class AimGeometry {
   public static double LAUNCH_AHEAD_OF_AXIS_M = 0.0048;
   /** CELL opening centre vs its tag cluster centre: this far toward the shooter, along the CELL's axis (m). */
   public static double OPENING_TOWARD_SHOOTER_M = 0.073;
+  /** Half the CELL opening's clear width (m; field CAD: 512 mm between the side skins). */
+  public static double OPENING_HALF_WIDTH_M = 0.256;
+  /** POLLEN radius (m; 2.80 in). */
+  public static double BALL_RADIUS_M = 0.0356;
 
   /** Tag centres along the cluster's row, ids firstID + 0..3, + = right as seen from the front (m). */
   static final double[] TAG_ROW_OFFSET_M = {-6.5 * 0.0254, -2.75 * 0.0254, 2.75 * 0.0254, 6.5 * 0.0254};
@@ -81,11 +85,17 @@ public class AimGeometry {
     public final double formulaDistanceM;
     /** Lens to the tag cluster's centre, horizontal (m), for telemetry. */
     public final double tagDistanceM;
+    /**
+     * How far (deg, either side) the shot line may be off and the ball still pass the opening's sides: the opening's
+     * width as seen from here (narrower off its axis) minus the ball, over the distance.
+     */
+    public final double windowDeg;
 
-    Aim(double correctionDeg, double formulaDistanceM, double tagDistanceM) {
+    Aim(double correctionDeg, double formulaDistanceM, double tagDistanceM, double windowDeg) {
       this.correctionDeg = correctionDeg;
       this.formulaDistanceM = formulaDistanceM;
       this.tagDistanceM = tagDistanceM;
+      this.windowDeg = windowDeg;
     }
   }
 
@@ -122,6 +132,10 @@ public class AimGeometry {
     // on the camera's distance with the camera CAM_BEHIND_AXIS_M + LAUNCH_AHEAD_OF_AXIS_M (69 mm) behind the launch
     double launchToOpening = Math.hypot(x, y) - LAUNCH_AHEAD_OF_AXIS_M;
     double formulaDistance = launchToOpening + LAUNCH_AHEAD_OF_AXIS_M + CAM_BEHIND_AXIS_M;
-    return new Aim(correctionDeg, formulaDistance, Math.hypot(centreF, centreR));
+    // Window: the angle between the line of sight (opening -> turret) and the CELL's axis narrows the opening
+    double cosOff = Math.abs(-x * outF + y * outR) / Math.hypot(x, y);   // the axis in the turret frame: (outF, -outR)
+    double half = OPENING_HALF_WIDTH_M * cosOff - BALL_RADIUS_M;
+    double windowDeg = Math.toDegrees(Math.atan2(Math.max(0, half), launchToOpening));
+    return new Aim(correctionDeg, formulaDistance, Math.hypot(centreF, centreR), windowDeg);
   }
 }

@@ -7,6 +7,7 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.util.ElapsedTime;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+import org.firstinspires.ftc.teamcode.AllianceColor;
 import org.firstinspires.ftc.teamcode.PoseStorage;
 import org.firstinspires.ftc.teamcode.Robot;
 import org.firstinspires.ftc.teamcode.Subsystems.HiveTargeting;
@@ -58,6 +59,8 @@ public class BaseTeleop {
       this.resetOdometryAtWall();
       this.updateCellTarget();
       telemetry.addData("ALLIANCE COLOR", robot.getAllianceColor());
+      telemetry.addLine("Turret must point " + (robot.getAllianceColor() == AllianceColor.RED
+          ? "LEFT" : "RIGHT") + " (its rest) when INIT is pressed: the encoder zeroes there");
       addTargetTelemetry();
       telemetry.update();
     }
@@ -75,10 +78,7 @@ public class BaseTeleop {
       double y = -this.opMode.gamepad1.left_stick_y;
       float rotStickAvg = this.opMode.gamepad1.right_stick_x + this.opMode.gamepad2.right_stick_x;
 
-      this.robot.updateAimingSystem(
-          this.opMode.gamepad1.right_bumper || this.opMode.gamepad2.right_bumper,
-          this.opMode.gamepad1.square
-      );
+      this.robot.updateAimingSystem(this.opMode.gamepad1.right_bumper || this.opMode.gamepad2.right_bumper);
 
       this.fieldCentricDrive(x, y, rotStickAvg);
 
@@ -182,11 +182,13 @@ public class BaseTeleop {
         targeting.isAuto() ? "auto" : "manual until the " + targeting.cell().name().toLowerCase() + " tiles");
     telemetry.addData("Zone", "%s (y %.1f in)", targeting.zone(), p.y());
     if (robot.limelight.hasValidTarget()) {
-      telemetry.addData("Aim", "%d tags, turn %+.1f deg, opening %.2f m", robot.limelight.hiveTagCount,
-          robot.limelight.aimCorrectionDeg(), robot.limelight.distance);
+      telemetry.addData("Aim", "%s: %d tags, turn %+.1f deg, opening %.2f m, aimed within %.1f deg%s",
+          robot.limelight.aimSource(), robot.limelight.hiveTagCount, robot.limelight.aimCorrectionDeg(),
+          robot.limelight.distance, robot.limelight.aimedThresholdDeg(), robot.limelight.isAimed() ? " - AIMED" : "");
     } else {
-      telemetry.addData("Aim", "no tags of the target CELL");
+      telemetry.addData("Aim", "%s: no tags of the target CELL", robot.limelight.aimSource());
     }
+    telemetry.addData("Turret error", robot.limelight.error);   // a number: plot it in Panels' Graph to tune AIM_*
     telemetry.addData("Pose", "x %.1f  y %.1f  h %.0f deg", p.x(), p.y(), Math.toDegrees(p.heading()));
     telemetry.addData("Pose from", "%s  (gp2 square = reset y at the audience wall)", poseSource);
     if (running == requested || running < 0) {

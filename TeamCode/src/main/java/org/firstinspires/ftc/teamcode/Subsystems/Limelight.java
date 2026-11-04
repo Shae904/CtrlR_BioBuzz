@@ -1,6 +1,8 @@
 package org.firstinspires.ftc.teamcode.Subsystems;
 
 import com.bylazar.configurables.annotations.Configurable;
+import com.pedropathing.math.Pose;
+import com.pedropathing.math.Twist;
 import com.qualcomm.hardware.limelightvision.LLResult;
 import com.qualcomm.hardware.limelightvision.LLResultTypes.FiducialResult;
 import com.qualcomm.hardware.limelightvision.Limelight3A;
@@ -23,8 +25,17 @@ public class Limelight {
   public static double AIM_Ks = 0.04;
 
   public static double AIM_DEADBAND = .3;
+  /** Turret power per deg/s of the target's own motion (the robot turning), feed-forward. ~1/free speed (~1040 deg/s). */
+  public static double AIM_Kv = 0.0008;
 
-  public static double AIM_RGB_THRESHOLD = 4;
+  /** "Aimed" light: |turret error| under this fraction of the opening's window from here, and never over the cap. */
+  public static double AIM_WINDOW_FRACTION = 0.5;
+  public static double AIM_RGB_THRESHOLD = 2;
+  /** A Limelight result older than this (ms) is no target (camera stopped sending). */
+  public static int STALE_MS = 300;
+  /** The opening of each RED CELL when it is up (in, Pedro): the teleop pre-aim from odometry; BLUE is rotated. */
+  public static double[] OPENING_RED_AUDIENCE_IN = {57.8, 54.8};
+  public static double[] OPENING_RED_SCORING_IN = {57.8, 86.25};
 
   // --- BIOBUZZ AprilTags (manual 9.9 / Figure 9-17): 16 tags, 4 per CELL, on each CELL's underside ---
   //   red scoring 30-33, red audience 34-37, blue audience 38-41, blue scoring 42-45
@@ -93,6 +104,18 @@ public class Limelight {
   private double cameraYawRad;       // the camera's (= shot line's) field heading: robot heading + turret angle
   private final AimGeometry.Cluster[] clusters = {
       new AimGeometry.Cluster(), new AimGeometry.Cluster(), new AimGeometry.Cluster(), new AimGeometry.Cluster()};
+  private double windowDeg = Double.NaN;  // the opening's window from here (deg), for the "aimed" light
+
+  // Field-held aim (TurretTracker): camera delay, robot turning, lost tags
+  private final TurretTracker tracker = new TurretTracker();
+  private double headingDeg;             // robot heading now (deg, CCW)
+  private double robotXIn;
+  private double robotYIn;
+  private double yawRateDegS;            // robot turn rate (deg/s, CCW)
+  private double lastFrameTimestamp = Double.NaN;
+  private long lastAimCallNs;
+  /** Where the turret target came from: REST, VISION, HOLD (tags just lost), ODOMETRY (teleop pre-aim), LAST (autos). */
+  private String aimSource = "REST";
 
   public double target;
 
@@ -272,6 +295,7 @@ public class Limelight {
     this.tagDistance = aim.tagDistanceM;
     this.aimCorrection = aim.correctionDeg;
     this.distance = aim.formulaDistanceM;
+    this.windowDeg = aim.windowDeg;
   }
 
   /** The turret turn (deg, + = right) the last frame asked for, before the trim and the lead. */
@@ -280,18 +304,47 @@ public class Limelight {
   }
 
   /**
-   * @param xVelocity       robot velocity to its right (m/s)
-   * @param yVelocity       robot velocity forward (m/s)
-   * @param robotHeadingRad the robot's field heading (Pedro, CCW): with the turret angle, the camera's field heading
+   * Every loop while aiming, before {@link #updateTarget}: reads the Limelight and, on a new frame, sets the aim from
+   * where the turret and the robot were when that frame was taken (TurretTracker).
+   *
+   * @param robotPose        Pedro pose (in, rad): the heading for the camera's field heading, x/y for the pre-aim
+   * @param robotTwist       Pedro robot-frame velocity (in/s forward, in/s left, rad/s CCW)
+   * @param turretEncoderDeg the turret encoder angle (Outtake.getTurretPosDegrees)
    */
-  public void updateAim(double xVelocity, double yVelocity, double robotHeadingRad) {
-    // Turret position: 180 = shooting forward, 90 = left (CW +), so the shot line is (180 - position) CCW of forward
-    this.cameraYawRad = robotHeadingRad + Math.toRadians(180 - turretPosition);
-    // Update goal
+  public void updateAim(Pose robotPose, Twist robotTwist, double turretEncoderDeg) {
+    long now = System.nanoTime();
+    if (now - lastAimCallNs > 200_000_000L) {   // a new aiming session: drop the old history and fix
+      tracker.reset();
+      lastFrameTimestamp = Double.NaN;
+    }
+    lastAimCallNs = now;
+    this.turretPosition = turretEncoderDeg + currentColor.getSteadyState();
+    this.headingDeg = Math.toDegrees(robotPose.heading());
+    this.robotXIn = robotPose.x();
+    this.robotYIn = robotPose.y();
+    this.yawRateDegS = Math.toDegrees(robotTwist.omega);
+    tracker.record(now, turretPosition, headingDeg);
+
+    // Update goal; a new frame is looked at from where the turret and the robot were when it was taken
     this.currentGoal = this.limelight.getLatestResult();
+    boolean newFrame = currentGoal != null && currentGoal.getTimestamp() != lastFrameTimestamp;
+    double turretAtCapture = turretPosition;
+    double headingAtCapture = headingDeg;
+    if (newFrame) {
+      lastFrameTimestamp = currentGoal.getTimestamp();
+      long captureNs = currentGoal.getControlHubTimeStampNanos()
+          - (long) ((currentGoal.getCaptureLatency() + currentGoal.getTargetingLatency()) * 1e6);
+      double[] then = tracker.at(captureNs);
+      turretAtCapture = then[0];
+      headingAtCapture = then[1];
+    }
+    // Turret position: 180 = shooting forward, 90 = left (CW +), so the shot line is (180 - position) CCW of forward
+    this.cameraYawRad = Math.toRadians(headingAtCapture + 180 - turretAtCapture);
     this.updateHiveTarget();
 
-    // Update Velocities and Angles
+    // Update Velocities and Angles (robot frame: x to the right, y forward, m/s)
+    double xVelocity = -robotTwist.vy * 0.0254;
+    double yVelocity = robotTwist.vx * 0.0254;
     double txRad = Math.toRadians(this.aimCorrection);
 
     double turretRad = Math.toRadians(turretPosition + 180);
@@ -303,6 +356,10 @@ public class Limelight {
 
     this.vParallel = xVelocity * Math.sin(totalAngleRad)
         + yVelocity * Math.cos(totalAngleRad); // figure this out
+
+    if (newFrame && this.hasValidTarget()) {
+      tracker.visionFix(now, turretAtCapture, headingAtCapture, this.calculateError());
+    }
   }
 
   /**
@@ -333,30 +390,68 @@ public class Limelight {
   }
 
   public boolean hasValidTarget() {
-    return currentGoal != null && currentGoal.isValid() && this.hiveSeen;
+    return currentGoal != null && currentGoal.isValid() && this.hiveSeen && currentGoal.getStaleness() < STALE_MS;
   }
 
+  /**
+   * The turret target: at rest when not aiming; else the field direction of the last frames (VISION, or HOLD for
+   * TurretTracker.LOST_HOLD_MS after the tags are lost) for the robot's heading now; then, in the teleop (a target
+   * CELL), straight at that CELL's opening from odometry (ODOMETRY); in the autos, the pre-aim they set (LAST).
+   * Limited to the turret's range (TurretTracker.limit).
+   */
   public void updateTarget(double turretPos, boolean shouldAim, AllianceColor color) {
+    long now = System.nanoTime();
     this.turretPosition = turretPos + color.getSteadyState();
 
-    if (this.hasValidTarget() && shouldAim) {
-      double rawTarget = this.turretPosition + this.calculateError();
-      // wrap
-      rawTarget = ((rawTarget % 360) + 360) % 360;
-
-      if (Math.abs(error) < 45) {
-        target = rawTarget;
+    if (!shouldAim) {
+      target = color.getSteadyState();
+      aimSource = "REST";
+    } else if (tracker.hasRecentFix(now)) {
+      target = tracker.targetFromField(headingDeg);
+      aimSource = this.hasValidTarget() ? "VISION" : "HOLD";
+      if (this.hasValidTarget()) {
         lastTarget = target;
       }
-
-    } else if (shouldAim && !this.hasValidTarget()) {
+    } else if (targetCell != null) {
+      double[] opening = openingIn(color, targetCell);
+      target = TurretTracker.targetFromBearing(headingDeg,
+          TurretTracker.openingBearingDeg(robotXIn, robotYIn, Math.toRadians(headingDeg), opening[0], opening[1]));
+      aimSource = "ODOMETRY";
+    } else {
       target = lastTarget;
-
-    } else if (!shouldAim) {
-      target = color.getSteadyState();
+      aimSource = "LAST";
     }
-
+    target = TurretTracker.limit(target, this.turretPosition);
     error = target - this.turretPosition;
+  }
+
+  /** The opening of {@code color}'s {@code cell} when it is up (in, Pedro); BLUE's is RED's rotated about the centre. */
+  static double[] openingIn(AllianceColor color, HiveTargeting.Cell cell) {
+    double[] red = cell == HiveTargeting.Cell.AUDIENCE ? OPENING_RED_AUDIENCE_IN : OPENING_RED_SCORING_IN;
+    if (color == AllianceColor.RED) {
+      return red;
+    }
+    // BLUE's CELL facing the same wall is RED's other CELL rotated 180 degrees
+    double[] other = cell == HiveTargeting.Cell.AUDIENCE ? OPENING_RED_SCORING_IN : OPENING_RED_AUDIENCE_IN;
+    return new double[]{HiveTargeting.FIELD_IN - other[0], HiveTargeting.FIELD_IN - other[1]};
+  }
+
+  /** Where the turret target comes from now: REST, VISION, HOLD, ODOMETRY or LAST. */
+  public String aimSource() {
+    return aimSource;
+  }
+
+  /** The "aimed" threshold (deg): a fraction of the opening's window from here, capped at AIM_RGB_THRESHOLD. */
+  public double aimedThresholdDeg() {
+    if (Double.isNaN(windowDeg)) {
+      return AIM_RGB_THRESHOLD;
+    }
+    return Math.min(AIM_RGB_THRESHOLD, AIM_WINDOW_FRACTION * windowDeg);
+  }
+
+  /** The turret is on the target CELL's opening closely enough to shoot (what the light shows as aimed). */
+  public boolean isAimed() {
+    return !"REST".equals(aimSource) && this.hasValidTarget() && Math.abs(error) < aimedThresholdDeg();
   }
 
 
@@ -372,29 +467,34 @@ public class Limelight {
     derivative = Range.clip(derivative, -50, 50); // prevent explosion on large error jumps
     aimLastError = error;
 
-    // PID Output
-
-    if (Math.abs(error) < AIM_DEADBAND) {
-      aimIntegral = 0;
-      return 0;
-    }
-
-    if (target == this.currentColor.getSteadyState()) {
+    // Light first (also inside the deadband): aimed = within a fraction of the opening's window from here
+    double threshold = aimedThresholdDeg();
+    if ("REST".equals(aimSource)) {
       rgb.setPosition(.277);
-    } else if (Math.abs(error) < AIM_RGB_THRESHOLD && this.hasValidTarget()) {
+    } else if (Math.abs(error) < threshold && this.hasValidTarget()) {
       rgb.setPosition(.5);
-    } else if (Math.abs(error) > AIM_RGB_THRESHOLD && this.hasValidTarget()) {
+    } else if (this.hasValidTarget()) {
       rgb.setPosition(0.277);
-    } else if (Math.abs(error) < AIM_RGB_THRESHOLD && !this.hasValidTarget()) {
+    } else if (Math.abs(error) < threshold) {
       rgb.setPosition(.611);
     } else {
       rgb.setPosition(0);
     }
 
+    // The target moves with the robot's heading (field-held): feed that rate forward
+    double feedForward = "REST".equals(aimSource) ? 0 : AIM_Kv * yawRateDegS;
+
+    // PID Output
+    if (Math.abs(error) < AIM_DEADBAND) {
+      aimIntegral = 0;
+      return Range.clip(feedForward, -1, 1);
+    }
+
     double output = AIM_Kp * error
         + AIM_Ki * aimIntegral
         + AIM_Kd * derivative
-        + AIM_Ks * Math.signum(error);
+        + AIM_Ks * Math.signum(error)
+        + feedForward;
 
     // Clamp for safety
     output = Range.clip(output, -1, 1);
