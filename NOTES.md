@@ -5,7 +5,7 @@ did most of the code since the Pedro 3 upgrade. Treat it as a coworker's notes: 
 not rules. Keep it current: when you change something it describes, change it here too, and add a line to the log at
 the bottom.
 
-Kept current through PR #24 (2026-11-04) unless a section says otherwise.
+Kept current through PR #26 (2026-11-04) unless a section says otherwise.
 
 ---
 
@@ -79,7 +79,7 @@ inches, origin at the red/audience corner, x toward blue, y toward the rear wall
 
 `Limelight.calculateTargetVelocity()`: `ticks = d·(SHOT_A·d − SHOT_B)^−0.5 / SHOT_K + SHOT_OFFSET − vParallel·SHOT_MOVE_GAIN`, with `d` = camera→opening horizontal distance in m (`tagDistance + OPENING_BEYOND_TAGS_M`), rounded to 20. `TOF_A/B` give time of flight for leading moving shots.
 
-**Default since PR #24: the 58° fit** (`Limelight.SHOT_MODEL_58_DEG = true`; `SHOT58_*`, `TOF58_*`, move gain 93·cos 58°): the team saw shots go over after locking on, which matches the 52.6° fit asking too much close in (camera→opening 1.2 m: 1280 vs 1160, 1.3 m: 1200 vs 1140; same 1140 at 1.54 m; more far out: 2.0 m 1200 vs 1140, 3.0 m 1380 vs 1280). Field tools: `SHOT_TRIM_TICKS` (gp2 dpad up/down ±10 in auto-speed mode), "TOO CLOSE" under `TOO_CLOSE_M` 1.3 m, and a distance cross-check (3D distance vs the distance from the tags' known height and the camera pitch; off by > 15% → check the pipeline's marker size 82.55 mm). The 52.6° fit below stays as `SHOT_*` (switch off in Panels to go back).
+**The 52.6° fit is the default** (PR #24 had switched to the 58° fit, PR #26 switched back): the shots go over at **medium range after a 2–4 s spin-up**, and the 58° fit (`SHOT_MODEL_58_DEG`, `SHOT58_*`, `TOF58_*`) asks for *more* there (2.0 m 1200 vs 1140, 2.5 m 1280 vs 1200; less close in: 1.3 m 1140 vs 1200; both 1140 at 1.54 m). It stays as a Panels switch for experiments. Field tools: `SHOT_TRIM_TICKS` (gp2 dpad up/down ±10 in auto-speed mode), "TOO CLOSE" under `TOO_CLOSE_M` 1.3 m, and a distance cross-check (3D distance vs the distance from the tags' known height and the camera pitch; off by > 15% → check the pipeline's marker size 82.55 mm). The 52.6° fit below stays as `SHOT_*` (switch off in Panels to go back).
 
 52.6° constants (PR #13, 2026-10-19): `SHOT_A 0.280894269484, SHOT_B 0.240816326531, SHOT_K 0.0025098411518, SHOT_OFFSET −261, TOF_A 1.505, TOF_B 1.44`. Model behind them: 52.6° launch (48° hood + DECODE's 4.6° spring-back), **no slip loss** (eta 1.013), 2.80 in pollen, fitted so **1140 ticks/s scores from the auto corner** (camera 1.54 m from the opening), which the team measured on the robot. Predicts 1146 at 2 m, 1205 at 2.5 m, 1280 at 3 m.
 
@@ -149,6 +149,7 @@ Ryan Lim (github `inevident`, commits as `inevident <ryanlimpre@gmail.com>`), te
 
 ## Log (newest first; add a line when you change the robot)
 
+- 2026-11-04: PR #26 back to the 52.6° shot fit by default: the overshoot is at medium range after a 2–4 s spin-up, where the 58° fit asks for more, not less. (Claude/Ryan)
 - 2026-11-04: PR #24 after field testing: shots over after locking on → the 58° shot fit is the default (Logger Pro 58°, CAD v11 hood 53°); field trims on gp2 dpad (speed ±10, aim ±0.5°, auto-speed mode); "TOO CLOSE" warning; 3D-vs-tag-height distance check (marker size). Automatic cell switching removed: gp2 square (Xbox X) = audience, circle (Xbox B) = scoring; wall reset moved to gp2 back. Camera offset checked in the CAD (v11): matches the code. (Claude/Ryan)
 - 2026-11-04: PR #23 HIVE 4 park path: Bézier curve with control point `PARK_VIA_RED` (34, 64) instead of the straight line along the red wall (flower 0.05 → ~8.4 in, hive foot bar ~9.0 in; footprint swept along the path with the heading turn). (Claude/Ryan)
 - 2026-11-04: PR #22 review fixes (Claude's own review + an independent agent review, every finding verified in the code): seam hysteresis; odometry pre-aim gives up after 1.5 s per press; turn feed-forward only for field-held targets; delay history every loop; a cell needs 3D poses (no ty fallback that could aim at a down cell); default flywheel 1150; pipeline request bookkeeping; held aim cleared on a cell switch; PID dt capped + no integral windup at rest; velocity split uses the held aim; stale gp2 LB / INIT dpad presses dropped; SensorTest null check. Reported, not changed: HIVE 4 wall/flower clearances, old manual presets, 10 ms capture-time error. (Claude/Ryan)

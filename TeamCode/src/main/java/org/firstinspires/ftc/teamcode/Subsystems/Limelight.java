@@ -71,13 +71,12 @@ public class Limelight {
   public static double TOF_B = 1.44;
 
   /**
-   * The same fit for a 58 deg launch, the default since 2026-11-04: Logger Pro measured ~58 deg on the robot
-   * (2026-10-21), and ghettoturret v11 (2026-10-23) has HoodExitAngle 53 deg (+ the 4.6 deg spring-back = 57.6; the
-   * fit above assumes the old 48 deg hood, 52.6). Both give 1140 at the auto corner (1.54 m); the 58 deg one asks for
-   * less closer in (1.3 m: 1144 vs 1208, which shot over) and more farther out (2.0 m: 1198 vs 1145, 3.0 m: 1386 vs
-   * 1279). false = back to the 52.6 deg fit (Panels).
+   * The same fit for a 58 deg launch (Logger Pro measured ~58 deg on 2026-10-21; ghettoturret v11 has HoodExitAngle
+   * 53 deg): both give 1140 at the auto corner (1.54 m), the 58 deg one less closer in (1.3 m: 1140 vs 1200) and MORE
+   * farther out (2.0 m: 1200 vs 1140, 2.5 m: 1280 vs 1200). Off: on the robot the shots go over at MEDIUM range after a
+   * full spin-up, where this fit asks for even more (2026-11-04). Panels switch, for experiments only.
    */
-  public static boolean SHOT_MODEL_58_DEG = true;
+  public static boolean SHOT_MODEL_58_DEG = false;
   public static double SHOT58_A = 0.295833167927;
   public static double SHOT58_B = 0.212244897959;
   public static double SHOT58_K = 0.0021473714554;
