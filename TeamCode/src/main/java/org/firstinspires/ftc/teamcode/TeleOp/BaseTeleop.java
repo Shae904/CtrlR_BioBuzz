@@ -51,13 +51,13 @@ public class BaseTeleop {
     targeting = new HiveTargeting(start.y());
     robot.limelight.targetCell(targeting.cell());
 
-    // --- INIT LOOP --- (the CELL buttons work here too)
+    // --- INIT LOOP --- (the CELL buttons and the wall reset work here too)
     while (this.opMode.opModeInInit()) {
       this.robot.clearBulkCache();
       this.robot.follower.update();
+      this.resetOdometryAtWall();
       this.updateCellTarget();
       telemetry.addData("ALLIANCE COLOR", robot.getAllianceColor());
-      telemetry.addData("Start pose", poseSource);
       addTargetTelemetry();
       telemetry.update();
     }
@@ -67,6 +67,7 @@ public class BaseTeleop {
     while (opMode.opModeIsActive()) {
       this.robot.clearBulkCache();
       this.robot.follower.update();
+      this.resetOdometryAtWall();
       this.updateCellTarget();
 
       // DRIVETRAIN
@@ -155,6 +156,24 @@ public class BaseTeleop {
     robot.limelight.targetCell(cell);
   }
 
+  /**
+   * ODOMETRY RESET (gamepad2 square): with the robot pushed against the AUDIENCE wall (anywhere along it, any face),
+   * sets the odometry y to the robot centre's distance from that wall (from the footprint and the heading); x and
+   * heading are kept, since only y decides the CELL. Automatic CELL switching resumes.
+   */
+  private void resetOdometryAtWall() {
+    if (!this.opMode.gamepad2.squareWasPressed()) {
+      return;
+    }
+    Pose p = robot.follower.pose();
+    double y = HiveTargeting.audienceWallY(p.heading());
+    robot.follower.setPose(new Pose(p.x(), y, p.heading()));
+    targeting.odometryReset(y);
+    poseSource = String.format("y reset at the audience wall (%.1f in, %s)", y,
+        this.opMode.opModeInInit() ? "in INIT" : "in the match");
+    this.opMode.gamepad2.rumble(400);
+  }
+
   private void addTargetTelemetry() {
     Pose p = robot.follower.pose();
     int requested = robot.limelight.requestedPipeline();
@@ -163,6 +182,7 @@ public class BaseTeleop {
         targeting.isAuto() ? "auto" : "manual until the " + targeting.cell().name().toLowerCase() + " tiles");
     telemetry.addData("Zone", "%s (y %.1f in)", targeting.zone(), p.y());
     telemetry.addData("Pose", "x %.1f  y %.1f  h %.0f deg", p.x(), p.y(), Math.toDegrees(p.heading()));
+    telemetry.addData("Pose from", "%s  (gp2 square = reset y at the audience wall)", poseSource);
     if (running == requested || running < 0) {
       pipelineMismatch.reset();
     } else if (pipelineMismatch.seconds() > 1.0) {
