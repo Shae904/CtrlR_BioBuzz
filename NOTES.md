@@ -5,7 +5,7 @@ did most of the code since the Pedro 3 upgrade. Treat it as a coworker's notes: 
 not rules. Keep it current: when you change something it describes, change it here too, and add a line to the log at
 the bottom.
 
-Kept current through PR #19 (2026-11-04) unless a section says otherwise.
+Kept current through PR #20 (2026-11-04) unless a section says otherwise.
 
 ---
 
@@ -46,8 +46,8 @@ inches, origin at the red/audience corner, x toward blue, y toward the rear wall
 **Turret** `ghettoturret:1`
 - Axis at robot (−13.8, −46.25) mm, i.e. 13.8 behind and 46.25 right of centre; turret plane 247.9 mm above the floor.
 - Motor: Yellow Jacket 435 RPM, 2.5:1 spur (40 T) → `Outtake.ticksPerDeg = 2.6701388889` (384.5 × 2.5 / 360). Motor `turret` REVERSE.
-- Code convention: turret position = encoder degrees + `AllianceColor.getSteadyState()` (RED 90, BLUE 270). **180 = shooter forward, 90 = shooter pointing left, 270 = right.** So at INIT the shooter must point **left on RED, right on BLUE**; the encoder zeroes there.
-- Rotating inertia ≈ 0.03 kg·m² (sim estimate); the code's aim is a PID on Limelight tx (`Limelight.AIM_*`).
+- Code convention: turret position = encoder degrees + `AllianceColor.getSteadyState()` (RED 90, BLUE 270). **180 = shooter forward, 90 = shooter pointing left, 270 = right.** So at INIT the shooter must point **left on RED, right on BLUE**; the encoder zeroes there (every opmode). The geometric aim uses this angle + the robot heading for the camera's field heading: a turret off its rest at INIT by 5° costs ~6–14 mm of aim, more if worse.
+- Rotating inertia ≈ 0.03 kg·m² (sim estimate). The aim (PR #20, `Subsystems/AimGeometry`): the turret turn that puts the shot line through the CELL opening, from the measured tags (see §4 "Aim"); then the DECODE PID (`Limelight.AIM_*`, untuned for this turret).
 
 **Shooter** (flywheel + hood)
 - 2 × Yellow Jacket 6000 RPM (5203-2402-0001) on a 1:1 belt, 28 CPR → "ticks/s" in telemetry is encoder counts/s (1140 ticks/s ≈ 2440 RPM). Full power ≈ 2300 ticks/s (`kV = 0.0004348`). `flywheel1` FORWARD, `flywheel2` REVERSE; velocity is read from `flywheel1`. Rotor inertia 6.06e-4 kg·m² (Fusion mass properties).
@@ -86,7 +86,7 @@ Manual presets `Outtake.medSpeed 1380 / farSpeed 1560` are still the OLD model's
 
 Flywheel control: `power = (kS + kV·target + kP·error) · 12 / Vbatt` (`Outtake`, voltage-compensated). `kS 0, kV 0.0004348, kP 0.003`; the team tuned kS/kV/kP in Panels on 10-19 ("to our liking"), **check that the values in `Outtake.java` are the tuned ones**, Panels edits don't persist. `FLYWHEEL PID TESTING` opmode: triangle = kS/kV sweep, square = step test, circle = hold + shot recovery.
 
-Aim: `AllianceColor.getAimPose()` is the tx (deg) the turret centres the tags at (RED −5, BLUE −1). The autos use their own per-spot aim points (`AIM_TX_*`, −4.5 and −1.0), tuned in the sim: the camera sits 82 mm beside the shot line, so the aim point depends on where you shoot from. In the sim, BLUE's −1 missed; expect to retune BLUE.
+Aim (PR #20, `Subsystems/AimGeometry`, fed by `Limelight.updateHiveTarget`): each visible tag of the target cell gives its horizontal bearing (tx/ty **without the Limelight crosshair**, through the 35° pitch) and range (3D pose, else the up-cell height); from its known place in the row (ids firstID..+3 = −6.5, −2.75, +2.75, +6.5 in, left→right as seen from the side the cell faces; "right" = field +x for audience cells, −x for scoring cells, checked on the field CAD) each gives the cluster centre, so a missing tag no longer moves the aim. The opening is 73 mm from the centre toward the shooter; with the camera 64.4 mm behind the turret axis and 81.5 mm right of the shot line that gives the exact turn (`aimCorrectionDeg`) and the formula distance (launch→opening + 69 mm). Row direction / opening step come from the camera's field heading (robot heading + turret angle): 5° wrong ≈ 6–14 mm. Standalone test (field CAD tags, 4 cells × 9 spots × 8 headings × turret off ±20°, every tag subset): 0.00 mm with exact data. One trim for anything left over (camera yaw, sideways throw): `Limelight.AIM_TRIM_DEG` (+ = right), same for every spot and both alliances. **Replaced** the DECODE constants `AllianceColor.getAimPose()` (RED −5, BLUE −1, never refit; they missed by up to ~12 cm, BLUE ~11 cm right from its own corner) and the autos' per-spot `AIM_TX_*` trims. Teleop telemetry "Aim": tags used, turn, opening distance.
 
 ## 5. Pedro Pathing 3 and AutoTune
 
@@ -133,7 +133,7 @@ Field-centric drive on gamepad1 left stick, turn right stick (either pad). Left 
 
 Run `./gradlew :sim-app:run` → `http://localhost:7070` (Java 17+; the Android Studio JBR works: `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"`). It compiles `../CtrlR_BioBuzz/TeamCode` as-is, so the DS panel there lists these exact opmodes, with "place at start pose" read from the auto's own `setPose`. `./gradlew check` = ~580 tests (shot validation, Pedro localization round trip, both autos end to end, hive tip, field rules). Docs: `docs/PHYSICS.md` (every model + CALIBRATE list), `docs/research/07-robot-cad-measurements.md` (the CAD numbers above), `08` (field CAD), `09` (hive tip spec).
 
-**Known gap:** the sim has no `GoBildaPinpointDriver` stand-in yet, so since PR #14 the team's `Constants.createFollower` cannot run in the sim (localization + auto tests will fail there) until a Pinpoint model is added. Work-in-progress files for that are parked outside the repo; Ryan wants sim work to wait until he says so.
+**Known gap:** the sim has no `GoBildaPinpointDriver` stand-in yet, so since PR #14 the team's `Constants.createFollower` cannot run in the sim (localization + auto tests will fail there) until a Pinpoint model is added. Also behind the robot code: `LimelightDistanceTest` / `TeamTurretAimTest` still call `updateAim(x, y)` and `Limelight.OPENING_BEYOND_TAGS_M` (PR #20 made it `updateAim(x, y, heading)` and moved the geometry to `AimGeometry`); robot-config has no per-cell pipelines. Work-in-progress files for that are parked outside the repo; Ryan wants sim work to wait until he says so.
 
 ## 10. People / accounts
 
@@ -143,6 +143,7 @@ Ryan Lim (github `inevident`, commits as `inevident <ryanlimpre@gmail.com>`), te
 
 ## Log (newest first; add a line when you change the robot)
 
+- 2026-11-04: PR #20 geometric turret aim (`AimGeometry`): aim from the measured tag positions (cluster centre from any subset of tags, opening 73 mm in front, camera offset) instead of the DECODE fixed tx offsets; tx/ty without crosshair; `AIM_TRIM_DEG` for what's left; removed `AllianceColor.getAimPose()`, the autos' `AIM_TX_*` / `setAimPoint`. Scan before it (same day): DECODE PID gains untuned for this turret, latency (tx applied to the current encoder angle), 4° "aimed" LED, no re-acquire when the hive leaves the view, the back seam + INIT encoder zero, gp1 square full-power spin, 45° gate: not changed yet. (Claude/Ryan)
 - 2026-11-04: PR #19 odometry reset at the audience wall (gp2 square): sets only y from the footprint + heading, resumes automatic cell switching. (Claude/Ryan)
 - 2026-11-04: PR #18 teleop Limelight cell targeting: odometry zones (outer two tile rows per side) pick pipeline 3/4 (scoring) or 5/6 (audience); cross = audience, circle = scoring (either pad); `PoseStorage` carries the auto's pose into the teleop. Removed `AllianceColor.getLLPipelineAuto()` and the `Limelight` annotation check (it never fired, so the comp 1 autos ran on pipeline 1/2; and RED's value 3 was the wrong cell for HIVE 4). (Claude/Ryan)
 - 2026-10-25: CommanderSleepy "Comp 1 Changes" (e7a94ae): HIVE 4 shooting spot (12, 20) + park (14, 106, 90°); `AllianceColor.getLLPipelineAuto()` RED 3 / BLUE 4 with a check in `Limelight` meant to pick it in autos (never true, see PR #18). Recorded by Claude on review.
