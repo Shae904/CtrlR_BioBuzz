@@ -25,6 +25,12 @@ public class BaseHive4 extends BaseHiveAuto {
   public static double[] CELL_RED = {57.8, 54.8};
 
   public static double[] PARK_RED = {14.0, 106.0, 90};
+  /**
+   * RED control point of the curve from the shooting spot to the park, x in, y in: bows the path away from the red
+   * wall so the turning robot clears the red-wall flower (plate x 0-4.9, y 44.2-50.1) by ~8.4 in and the HIVE's west
+   * foot bar (x 45.8, y 51-90) by ~9.0 in. The straight line passed the flower with 0.05 in to spare.
+   */
+  public static double[] PARK_VIA_RED = {34.0, 64.0};
 
   public BaseHive4(LinearOpMode opMode, Robot robot) {
     super(opMode, robot);
@@ -57,7 +63,7 @@ public class BaseHive4 extends BaseHiveAuto {
     phase = "PARK";
     stopAiming();
     Pose park = fieldPose(PARK_RED);
-    driveTo(Paths.line(shoot, park).linear(shoot, park), 6000);
+    driveTo(Paths.curve(shoot, fieldPose(PARK_VIA_RED), park).linear(shoot, park), 6000);
     phase = "PARKED";
     holdUntilEnd();
   }
