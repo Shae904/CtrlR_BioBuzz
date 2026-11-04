@@ -3,7 +3,6 @@ package org.firstinspires.ftc.teamcode;
 import com.bylazar.telemetry.JoinedTelemetry;
 import com.bylazar.telemetry.PanelsTelemetry;
 import com.pedropathing.follower.Follower;
-import com.pedropathing.math.Twist;
 import com.qualcomm.hardware.lynx.LynxModule;
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot.LogoFacingDirection;
@@ -142,30 +141,25 @@ public class Robot {
     }
   }
 
-  public void updateAimingSystem(boolean shouldAim, boolean shouldReset) {
-    // AUTOAIM STUFF
-    if (shouldAim) {
-      // Robot-frame velocity (in/s): vx = forward, vy = left. Same as 2.x getVelocity().rotateVector(-getHeading()).
-      Twist botVelocity = this.follower.twist();
-      this.limelight.updateAim(((-botVelocity.vy * 2.54) / 100.0),
-          (botVelocity.vx * 2.54) / 100.0, // Getting velocities in inches / sec and converting to meters / sec
-          this.follower.pose().heading());
-    }
-    // Update PID while not auto aiming
+  /**
+   * Turret: aims at the target CELL while {@code shouldAim} (Limelight: field-held aim, see TurretTracker), else back to
+   * its rest direction. (The DECODE "reset" that faked the turret at 180 deg, gamepad1 square, spun it at full power
+   * while held: removed.)
+   */
+  public void updateAimingSystem(boolean shouldAim) {
     double turretPosition = this.outtake.getTurretPosDegrees();
-    if (shouldReset) {
-      turretPosition = 180;
+    if (shouldAim) {
+      // Pedro's robot-frame velocity (in/s forward, in/s left, rad/s) and pose
+      this.limelight.updateAim(this.follower.pose(), this.follower.twist(), turretPosition);
     }
-
-    this.limelight.updateTarget(turretPosition, shouldAim,
-        this.getAllianceColor()); // update things
+    this.limelight.updateTarget(turretPosition, shouldAim, this.getAllianceColor());
     this.outtake.setPowerTurret(this.limelight.updateAimPID());
   }
 
   public void updateAutoControls() {
     this.follower.update();
     this.outtake.updatePIDControl();
-    this.updateAimingSystem(true, false);
+    this.updateAimingSystem(true);
 
   }
 }

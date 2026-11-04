@@ -3,7 +3,6 @@ package org.firstinspires.ftc.teamcode.Auton;
 import com.bylazar.configurables.annotations.Configurable;
 import com.pedropathing.api.Paths;
 import com.pedropathing.math.Pose;
-import com.pedropathing.math.Twist;
 import com.pedropathing.paths.Path;
 import com.qualcomm.hardware.lynx.LynxModule.BulkCachingMode;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
@@ -180,11 +179,11 @@ public abstract class BaseHiveAuto {
    * through its opening (AimGeometry); before that the turret holds the pre-aim set in update().
    */
   private void aim() {
+    double turret = robot.outtake.getTurretPosDegrees();
     if (aiming) {
-      Twist v = robot.follower.twist();
-      robot.limelight.updateAim((-v.vy * 2.54) / 100.0, (v.vx * 2.54) / 100.0, robot.follower.pose().heading());
+      robot.limelight.updateAim(robot.follower.pose(), robot.follower.twist(), turret);
     }
-    robot.limelight.updateTarget(robot.outtake.getTurretPosDegrees(), aiming, robot.getAllianceColor());
+    robot.limelight.updateTarget(turret, aiming, robot.getAllianceColor());
     robot.outtake.setPowerTurret(robot.limelight.updateAimPID());
   }
 
