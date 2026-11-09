@@ -97,6 +97,10 @@ public class BaseTeleop {
       // FLAPPER: up (feeding) only while triangle is held on either pad, down otherwise
       robot.intake.setFlapper(this.opMode.gamepad2.triangle || this.opMode.gamepad1.triangle);
 
+      // FLOWER
+
+      robot.intake.setFlower(this.opMode.gamepad2.cross || this.opMode.gamepad1.cross);
+
       if (this.opMode.gamepad2.right_stick_button) {
         this.opMode.gamepad2.rumble(500);
         autoCalculateShootPower = true;

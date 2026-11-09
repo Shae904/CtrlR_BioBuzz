@@ -28,8 +28,12 @@ public class Intake {
 
   public static double FLAPPER_DOWN = 0.04;
 
-  public final ServoImplEx gate;
+  public static double FLOWER_UP = 0.3;
+  public static double FLOWER_DOWN = 0.04;
+
+  public final ServoImplEx gate,flower;
   private boolean flapperUp;
+  private boolean flowerDown;
 
   public Intake(LinearOpMode opMode) {
     HardwareMap hardwareMap = opMode.hardwareMap;
@@ -40,6 +44,7 @@ public class Intake {
     intakeMotor.setMode(RunMode.RUN_WITHOUT_ENCODER);
 
     gate = hardwareMap.get(ServoImplEx.class, "flapper");
+    flower = hardwareMap.get(ServoImplEx.class, "flower");
     setFlapper(false);   // starts DOWN (shut)
   }
 
@@ -47,6 +52,10 @@ public class Intake {
   public void setFlapper(boolean up) {
     flapperUp = up;
     gate.setPosition(up ? FLAPPER_UP : FLAPPER_DOWN);
+  }
+  public void setFlower(boolean down) {
+    flowerDown = down;
+    gate.setPosition(down ? FLOWER_DOWN : FLOWER_UP);
   }
 
   public boolean isFlapperUp() {
@@ -57,6 +66,7 @@ public class Intake {
   public void setFlapperPos(double pos) {
     gate.setPosition(pos);
   }
+  public void setFlowerPos(double pos) {flower.setPosition(pos);}
 
   public void setIntakePower(double pow) {
     intakeMotor.setPower(pow);

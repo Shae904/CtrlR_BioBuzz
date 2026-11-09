@@ -12,6 +12,7 @@ public class ServoTest extends LinearOpMode {
 
   Robot robot;
   public static double OUTTAKE_TEST_POS = Intake.FLAPPER_DOWN;
+  public static double FLOWER_TEST_POS = Intake.FLOWER_UP;
 
   public static double TILT_A_TEST_POS = Robot.TILT_A_FOLDED;
   public static double TILT_B_TEST_POS = Robot.TILT_B_FOLDED;
@@ -25,6 +26,7 @@ public class ServoTest extends LinearOpMode {
     // LOOP
     while (opModeIsActive()) {
       robot.intake.setFlapperPos(OUTTAKE_TEST_POS);
+      robot.intake.setFlowerPos(FLOWER_TEST_POS);
 
       robot.setTiltPos(TILT_A_TEST_POS, TILT_B_TEST_POS);
 
