@@ -99,7 +99,7 @@ public class BaseTeleop {
 
       // FLOWER
 
-      robot.intake.setFlower(this.opMode.gamepad2.cross || this.opMode.gamepad1.cross);
+      robot.intake.setFlower(this.opMode.gamepad2.cross || this.opMode.gamepad1.dpadDownWasPressed());
 
       if (this.opMode.gamepad2.right_stick_button) {
         this.opMode.gamepad2.rumble(500);
@@ -140,11 +140,6 @@ public class BaseTeleop {
         robot.intake.setIntakePower(0);
       }
 
-      if (this.opMode.gamepad1.dpadUpWasPressed()) {
-        robot.setTiltDeployed();
-      } else if (this.opMode.gamepad1.dpadLeftWasPressed()) {
-        robot.setTiltFolded();
-      }
 
       // TELEMETRY
       updateTelemetry();
@@ -157,14 +152,14 @@ public class BaseTeleop {
    * SDK sets the PS and Xbox names from the same physical button, so this works on either controller.
    */
   private void updateCellTarget() {
-    boolean toggle = this.opMode.gamepad1.dpadLeftWasPressed();
+    boolean toggle = this.opMode.gamepad1.dpadLeftWasPressed() || this.opMode.gamepad2.circleWasPressed();
     if (toggle && cell == HiveTargeting.Cell.AUDIENCE) {
       cell = HiveTargeting.Cell.SCORING;
     } else if (toggle && cell == HiveTargeting.Cell.SCORING) {
       cell = HiveTargeting.Cell.AUDIENCE;
     }
     if (toggle) {
-      this.opMode.gamepad2.rumble(150);
+      this.opMode.gamepad1.rumble(150);
     }
     robot.limelight.targetCell(cell);
   }
