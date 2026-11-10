@@ -1,6 +1,7 @@
 package org.firstinspires.ftc.teamcode.Subsystems;
 
 import com.bylazar.configurables.annotations.Configurable;
+import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.DcMotor.RunMode;
 import com.qualcomm.robotcore.hardware.DcMotor.ZeroPowerBehavior;
@@ -35,12 +36,13 @@ public class Outtake {
    * Soft start: a jump from rest asked for full power at zero speed (full motor torque), which made the belts skip.
    * When the target rises while the flywheel is below SOFT_START_BELOW_TICKS, the speed the controller aims for climbs
    * in a straight line from the flywheel's speed to the target at SOFT_START_RATE (constant, low acceleration torque):
-   * from rest 1000 in 3.3 s, 1150 in 3.8 s, 1560 in 5.2 s. Nothing else changes: a running flywheel (above the
+   * from rest 1000 in ~1.9 s, 1150 in ~2.1 s, 1560 in ~2.8 s, peak torque ~37% of stall instead of 100%. Never in an
+   * @Autonomous opmode (the autos spin up exactly as before). Nothing else changes: a running flywheel (above the
    * threshold) gets new targets at once, recovery after a shot is not ramped (the aim is already at the target), and
    * lowering the target is immediate. atTarget() and getTargetVelocity() still use the real target.
    */
   public static boolean SOFT_START = true;
-  public static double SOFT_START_RATE = 300;          // ticks/s gained per second
+  public static double SOFT_START_RATE = 600;          // ticks/s gained per second
   public static double SOFT_START_BELOW_TICKS = 700;   // "starting up" below this (~30% of the 12 V free speed)
   public static double SOFT_START_MAX_LEAD = 200;      // the ramp never runs further than this ahead of the flywheel
 
@@ -63,6 +65,8 @@ public class Outtake {
   private double lastPower;
   private double setpoint;                             // what the controller aims for (= the target unless ramping)
   private boolean ramping;
+  /** False in @Autonomous opmodes: the autos keep the full-power spin-up (their timing depends on it). */
+  private final boolean softStartAllowed;
   private final ElapsedTime rampTimer = new ElapsedTime();
 
   private final VoltageSensor battery;
@@ -88,6 +92,9 @@ public class Outtake {
     turret.setZeroPowerBehavior(ZeroPowerBehavior.BRAKE);
     turret.setMode(RunMode.STOP_AND_RESET_ENCODER);
     turret.setMode(RunMode.RUN_WITHOUT_ENCODER);
+
+    // the opmode's own class (RedHive4, RedTeleop, ...), so every @Autonomous opmode is excluded
+    softStartAllowed = !opMode.getClass().isAnnotationPresent(Autonomous.class);
 
     battery = hardwareMap.voltageSensor.iterator().next();
     readBatteryVoltage();
@@ -147,7 +154,7 @@ public class Outtake {
 
   /** The target, or while starting up from rest the ramp toward it (SOFT_START). */
   private double softStartSetpoint(double dt) {
-    if (!SOFT_START || this.targetVelocity <= this.setpoint) {
+    if (!SOFT_START || !softStartAllowed || this.targetVelocity <= this.setpoint) {
       ramping = false;                                   // lower targets (and no ramp): at once, as before
       return this.targetVelocity;
     }

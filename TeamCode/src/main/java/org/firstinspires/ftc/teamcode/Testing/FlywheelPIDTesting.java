@@ -44,7 +44,7 @@ public class FlywheelPIDTesting extends LinearOpMode {
   public static double FF_DWELL_S = 5.0;    // per step: the open-loop time constant is ~1.4 s (CAD inertia)
   public static double FF_SAMPLE_S = 1.0;   // averaged at the end of each step
   public static boolean FF_APPLY = true;    // write the fitted kS / kV into Outtake for this session
-  public static double FF_POWER_RAMP = 0.15; // open-loop power gained per second at most (soft start: belts skipped)
+  public static double FF_POWER_RAMP = 0.3;  // open-loop power gained per second at most (soft start: belts skipped)
 
   private enum Mode { IDLE, SWEEP, STEP, HOLD }
 
@@ -190,7 +190,7 @@ public class FlywheelPIDTesting extends LinearOpMode {
 
   /**
    * Open loop: holds each power until the flywheel settles, records (velocity, power in 12 V units). Rising power is
-   * ramped at FF_POWER_RAMP (from rest to the first step in 2 s); the samples are taken at the end of each step, long
+   * ramped at FF_POWER_RAMP (from rest to the first step in 1 s); the samples are taken at the end of each step, long
    * after the ramp, so the fit is unchanged.
    */
   private double updateSweep() {
