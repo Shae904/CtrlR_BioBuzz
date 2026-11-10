@@ -277,6 +277,7 @@ public class BaseTeleop {
 
     telemetry.addData("Vel Current", robot.outtake.getCurrentVelocity());
     telemetry.addData("Vel Target", robot.outtake.getTargetVelocity());
+    telemetry.addData("Vel Setpoint", robot.outtake.getSetpoint());   // = Vel Target except during the soft start
     telemetry.addData("At Target", robot.outtake.atTarget());
     addTargetTelemetry();
 
