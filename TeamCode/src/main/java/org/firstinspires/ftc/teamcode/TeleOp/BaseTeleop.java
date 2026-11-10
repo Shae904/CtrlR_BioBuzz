@@ -157,14 +157,13 @@ public class BaseTeleop {
    * SDK sets the PS and Xbox names from the same physical button, so this works on either controller.
    */
   private void updateCellTarget() {
-    boolean audience = this.opMode.gamepad2.squareWasPressed();
-    boolean scoring = this.opMode.gamepad2.circleWasPressed();
-    if (audience) {
-      cell = HiveTargeting.Cell.AUDIENCE;
-    } else if (scoring) {
+    boolean toggle = this.opMode.gamepad1.dpadLeftWasPressed();
+    if (toggle && cell == HiveTargeting.Cell.AUDIENCE) {
       cell = HiveTargeting.Cell.SCORING;
+    } else if (toggle && cell == HiveTargeting.Cell.SCORING) {
+      cell = HiveTargeting.Cell.AUDIENCE;
     }
-    if (audience || scoring) {
+    if (toggle) {
       this.opMode.gamepad2.rumble(150);
     }
     robot.limelight.targetCell(cell);

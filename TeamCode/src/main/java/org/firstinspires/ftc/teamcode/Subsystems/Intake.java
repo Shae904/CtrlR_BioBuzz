@@ -28,7 +28,7 @@ public class Intake {
 
   public static double FLAPPER_DOWN = 0.04;
 
-  public static double FLOWER_UP = 0.7;
+  public static double FLOWER_UP = 0.4;
   public static double FLOWER_DOWN = 0.87;
   public static double FLOWER_START = 0.4;
 
