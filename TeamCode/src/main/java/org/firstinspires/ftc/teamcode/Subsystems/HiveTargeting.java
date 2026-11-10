@@ -3,8 +3,8 @@ package org.firstinspires.ftc.teamcode.Subsystems;
 import com.bylazar.configurables.annotations.Configurable;
 
 /**
- * Which of our HIVE's two CELLS the Limelight looks at in TELEOP: chosen by the drivers (gamepad2 square / Xbox X =
- * AUDIENCE, circle / Xbox B = SCORING, BaseTeleop). There is no automatic switching; at INIT the teleop starts on the CELL of the field half
+ * Which of our HIVE's two CELLS the Limelight looks at in TELEOP: chosen by the drivers (gamepad2 circle / Xbox B
+ * toggles AUDIENCE / SCORING, BaseTeleop). There is no automatic switching; at INIT the teleop starts on the CELL of the field half
  * the robot is in ({@link #initialCell}), which after an AUTO is the side it parked on.
  *
  * <p>Field (manual 9.9, Figure 9-17; Pedro coordinates, inches, the audience wall at y = 0): each HIVE has an AUDIENCE

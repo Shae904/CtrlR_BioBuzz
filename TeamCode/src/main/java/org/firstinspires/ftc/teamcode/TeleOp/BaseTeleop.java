@@ -28,8 +28,10 @@ public class BaseTeleop {
   public static double SPEED_TRIM_STEP = 10;
   public static double AIM_TRIM_STEP = 0.5;
 
-  /** Which CELL the Limelight targets: gamepad2 square (Xbox X) = AUDIENCE, circle (Xbox B) = SCORING; no auto switching. */
+  /** Which CELL the Limelight targets: gamepad2 circle (Xbox B) toggles AUDIENCE / SCORING; no auto switching. */
   private HiveTargeting.Cell cell;
+  /** Flower toggled down by gamepad1 dpad down (gamepad2 cross also holds it down). */
+  private boolean flowerDown;
   private String poseSource = "";
   private final ElapsedTime pipelineMismatch = new ElapsedTime();
 
@@ -66,6 +68,7 @@ public class BaseTeleop {
       this.updateTrims();
       // drop presses of the match-only buttons made during INIT (they would fire at START)
       this.opMode.gamepad1.dpadUpWasPressed();
+      this.opMode.gamepad1.dpadDownWasPressed();
       this.opMode.gamepad1.dpadLeftWasPressed();
       this.opMode.gamepad1.leftBumperWasPressed();
       this.opMode.gamepad2.leftBumperWasPressed();
@@ -97,9 +100,12 @@ public class BaseTeleop {
       // FLAPPER: up (feeding) only while triangle is held on either pad, down otherwise
       robot.intake.setFlapper(this.opMode.gamepad2.triangle || this.opMode.gamepad1.triangle);
 
-      // FLOWER
-
-      robot.intake.setFlower(this.opMode.gamepad2.cross || this.opMode.gamepad1.dpadDownWasPressed());
+      // FLOWER: gamepad1 dpad down toggles it down / up; gamepad2 cross holds it down
+      if (this.opMode.gamepad1.dpadDownWasPressed()) {
+        flowerDown = !flowerDown;
+        this.opMode.gamepad1.rumble(100);
+      }
+      robot.intake.setFlower(flowerDown || this.opMode.gamepad2.cross);
 
       if (this.opMode.gamepad2.right_stick_button) {
         this.opMode.gamepad2.rumble(500);
@@ -110,7 +116,7 @@ public class BaseTeleop {
       }
 
       boolean formulaRead = this.opMode.gamepad2.leftBumperWasPressed();   // read every loop: no stale press later
-      if (this.opMode.gamepad1.dpad_down) {
+      if (this.opMode.gamepad1.dpad_up) {   // flywheel stop (was dpad down, now the flower toggle)
         robot.outtake.stop();
       } else if (autoCalculateShootPower) {
         if (this.opMode.gamepad1.right_bumper || this.opMode.gamepad2.right_bumper) {
@@ -147,19 +153,14 @@ public class BaseTeleop {
   }
 
   /**
-   * LIMELIGHT CELL, manual (gamepad2): square (Xbox X) = our AUDIENCE CELL (RED 34-37 / BLUE 38-41, pipeline 5 / 6),
-   * circle (Xbox B) = our SCORING CELL (RED 30-33 / BLUE 42-45, pipeline 3 / 4). Same buttons for both alliances. The
+   * LIMELIGHT CELL, manual, gamepad2 only: circle (Xbox B) toggles between our AUDIENCE CELL (RED 34-37 / BLUE 38-41,
+   * pipeline 5 / 6) and our SCORING CELL (RED 30-33 / BLUE 42-45, pipeline 3 / 4). Same button for both alliances; the
    * SDK sets the PS and Xbox names from the same physical button, so this works on either controller.
    */
   private void updateCellTarget() {
-    boolean toggle = this.opMode.gamepad1.dpadLeftWasPressed() || this.opMode.gamepad2.circleWasPressed();
-    if (toggle && cell == HiveTargeting.Cell.AUDIENCE) {
-      cell = HiveTargeting.Cell.SCORING;
-    } else if (toggle && cell == HiveTargeting.Cell.SCORING) {
-      cell = HiveTargeting.Cell.AUDIENCE;
-    }
-    if (toggle) {
-      this.opMode.gamepad1.rumble(150);
+    if (this.opMode.gamepad2.circleWasPressed()) {
+      cell = cell == HiveTargeting.Cell.AUDIENCE ? HiveTargeting.Cell.SCORING : HiveTargeting.Cell.AUDIENCE;
+      this.opMode.gamepad2.rumble(150);
     }
     robot.limelight.targetCell(cell);
   }
@@ -214,7 +215,7 @@ public class BaseTeleop {
     Pose p = robot.follower.pose();
     int requested = robot.limelight.requestedPipeline();
     int running = robot.limelight.runningPipeline();
-    telemetry.addData("Target CELL", "%s %s, pipeline %d  (gp2 square/X = audience, circle/B = scoring)", robot.getAllianceColor(),
+    telemetry.addData("Target CELL", "%s %s, pipeline %d  (gp2 circle/B toggles)", robot.getAllianceColor(),
         cell, requested);
     telemetry.addData("Trims", "speed %+.0f ticks/s (gp2 dpad up/down), aim %+.1f deg (dpad right/left)%s",
         Limelight.SHOT_TRIM_TICKS, Limelight.AIM_TRIM_DEG, Limelight.SHOT_MODEL_58_DEG ? ", 58 deg model" : "");
