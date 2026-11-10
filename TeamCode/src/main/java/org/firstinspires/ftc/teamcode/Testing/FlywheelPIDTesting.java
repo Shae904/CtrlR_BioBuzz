@@ -44,6 +44,7 @@ public class FlywheelPIDTesting extends LinearOpMode {
   public static double FF_DWELL_S = 5.0;    // per step: the open-loop time constant is ~1.4 s (CAD inertia)
   public static double FF_SAMPLE_S = 1.0;   // averaged at the end of each step
   public static boolean FF_APPLY = true;    // write the fitted kS / kV into Outtake for this session
+  public static double FF_POWER_RAMP = 0.15; // open-loop power gained per second at most (soft start: belts skipped)
 
   private enum Mode { IDLE, SWEEP, STEP, HOLD }
 
@@ -59,6 +60,10 @@ public class FlywheelPIDTesting extends LinearOpMode {
   private int samples;
   private double[] sweepVel, sweepPower12;
   private String sweepResult = "not run (press TRIANGLE)";
+
+  // sweep soft start
+  private final ElapsedTime sweepRampTimer = new ElapsedTime();
+  private double sweepAppliedPower;
 
   // step test state
   private final ElapsedTime stepTimer = new ElapsedTime();
@@ -166,6 +171,8 @@ public class FlywheelPIDTesting extends LinearOpMode {
 
   private void startSweep() {
     mode = Mode.SWEEP;
+    sweepAppliedPower = Math.max(0, outtake.getLastPower());   // ramp from what the flywheel was getting
+    sweepRampTimer.reset();
     sweepSteps = Math.max(2, FF_STEPS);
     sweepIndex = 0;
     sweepVel = new double[sweepSteps];
@@ -181,9 +188,16 @@ public class FlywheelPIDTesting extends LinearOpMode {
     return FF_MIN_POWER + (FF_MAX_POWER - FF_MIN_POWER) * i / (sweepSteps - 1);
   }
 
-  /** Open loop: holds each power until the flywheel settles, records (velocity, power in 12 V units). */
+  /**
+   * Open loop: holds each power until the flywheel settles, records (velocity, power in 12 V units). Rising power is
+   * ramped at FF_POWER_RAMP (from rest to the first step in 2 s); the samples are taken at the end of each step, long
+   * after the ramp, so the fit is unchanged.
+   */
   private double updateSweep() {
-    double power = sweepPower(sweepIndex);
+    double dt = Math.min(sweepRampTimer.seconds(), 0.1);
+    sweepRampTimer.reset();
+    double power = Math.min(sweepPower(sweepIndex), sweepAppliedPower + FF_POWER_RAMP * dt);
+    sweepAppliedPower = power;
     outtake.setPower(power);
     double vel = outtake.flywheel1.getVelocity();
     double dwell = FF_DWELL_S + (sweepIndex == 0 ? 2.0 : 0.0); // the first step starts from rest

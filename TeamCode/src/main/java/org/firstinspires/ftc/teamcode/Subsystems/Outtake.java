@@ -31,6 +31,19 @@ public class Outtake {
   public static boolean VOLTAGE_COMPENSATION = true; // same flywheel speed on a full or a tired battery
   public static double NOMINAL_VOLTAGE = 12.0;
 
+  /**
+   * Soft start: a jump from rest asked for full power at zero speed (full motor torque), which made the belts skip.
+   * When the target rises while the flywheel is below SOFT_START_BELOW_TICKS, the speed the controller aims for climbs
+   * in a straight line from the flywheel's speed to the target at SOFT_START_RATE (constant, low acceleration torque):
+   * from rest 1000 in 3.3 s, 1150 in 3.8 s, 1560 in 5.2 s. Nothing else changes: a running flywheel (above the
+   * threshold) gets new targets at once, recovery after a shot is not ramped (the aim is already at the target), and
+   * lowering the target is immediate. atTarget() and getTargetVelocity() still use the real target.
+   */
+  public static boolean SOFT_START = true;
+  public static double SOFT_START_RATE = 300;          // ticks/s gained per second
+  public static double SOFT_START_BELOW_TICKS = 700;   // "starting up" below this (~30% of the 12 V free speed)
+  public static double SOFT_START_MAX_LEAD = 200;      // the ramp never runs further than this ahead of the flywheel
+
 
   public static Direction flywheel1MotorDirection = Direction.FORWARD;
   public static Direction flywheel2MotorDirection = Direction.REVERSE;
@@ -48,6 +61,9 @@ public class Outtake {
 
   private double currentVelocity;
   private double lastPower;
+  private double setpoint;                             // what the controller aims for (= the target unless ramping)
+  private boolean ramping;
+  private final ElapsedTime rampTimer = new ElapsedTime();
 
   private final VoltageSensor battery;
   private final ElapsedTime voltageTimer = new ElapsedTime();
@@ -108,9 +124,12 @@ public class Outtake {
   // --- Main PID update loop ---
   public double updatePIDControl() {
     this.currentVelocity = this.flywheel1.getVelocity(); // ticks/sec
-    double error = this.targetVelocity - this.currentVelocity;
+    double dt = Math.min(rampTimer.seconds(), 0.1);      // the first call comes after the whole INIT wait
+    rampTimer.reset();
+    this.setpoint = softStartSetpoint(dt);
+    double error = this.setpoint - this.currentVelocity;
 
-    double output = (kV * this.targetVelocity) + (kP * error);
+    double output = (kV * this.setpoint) + (kP * error);
     if (this.targetVelocity > 0) {
       output += kS;
     }
@@ -124,6 +143,33 @@ public class Outtake {
     this.setPower(output);
     this.lastPower = output;
     return output;
+  }
+
+  /** The target, or while starting up from rest the ramp toward it (SOFT_START). */
+  private double softStartSetpoint(double dt) {
+    if (!SOFT_START || this.targetVelocity <= this.setpoint) {
+      ramping = false;                                   // lower targets (and no ramp): at once, as before
+      return this.targetVelocity;
+    }
+    if (!ramping) {
+      if (this.currentVelocity >= SOFT_START_BELOW_TICKS) {
+        return this.targetVelocity;                      // already running: at once, as before
+      }
+      ramping = true;                                    // starting up: ramp from where the flywheel is
+      this.setpoint = Math.max(0, this.currentVelocity);
+    }
+    double next = Math.min(this.setpoint + SOFT_START_RATE * dt,
+        Math.max(this.setpoint, this.currentVelocity + SOFT_START_MAX_LEAD));
+    if (next >= this.targetVelocity) {
+      ramping = false;
+      return this.targetVelocity;
+    }
+    return next;
+  }
+
+  /** What the controller aims for now: the target, or the soft-start ramp toward it. */
+  public double getSetpoint() {
+    return this.setpoint;
   }
 
   public double getLastPower() {
