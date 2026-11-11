@@ -52,10 +52,13 @@ public class Limelight {
   /** Aim trim (deg, + = right) on top of the geometry: one number for a camera yaw error or a sideways throw. */
   public static double AIM_TRIM_DEG = 0;
   /**
-   * Extra aim trim (deg, + = right, - = left, as seen from behind the shooter) only while the turret aims at the BLUE
-   * SCORING CELL (tags 42-45, the blue CELL facing the far wall): added to AIM_TRIM_DEG, teleop and autos. Panels.
+   * Extra aim trim per CELL (deg, + = right, - = left, as seen from behind the shooter): added to AIM_TRIM_DEG only
+   * while the turret aims at that CELL, in the teleop and the autos. Panels.
    */
-  public static double AIM_TRIM_BLUE_SCORING_DEG = 0;
+  public static double AIM_TRIM_RED_SCORING_DEG = 0;    // tags 30-33: the red CELL facing the far wall
+  public static double AIM_TRIM_RED_AUDIENCE_DEG = 0;   // tags 34-37: the red CELL facing the audience wall
+  public static double AIM_TRIM_BLUE_AUDIENCE_DEG = 0;  // tags 38-41: the blue CELL facing the audience wall
+  public static double AIM_TRIM_BLUE_SCORING_DEG = 0;   // tags 42-45: the blue CELL facing the far wall
 
   // --- Shot formula from the CAD + physics model (vibecadded-ftc/shooter-model/DERIVATION.md) ---
   // ticks/s = (d * (SHOT_A * d - SHOT_B)^-0.5 / SHOT_K + SHOT_OFFSET) / SHOT_ETA
@@ -433,10 +436,34 @@ public class Limelight {
     return this.aimCorrection + aimTrimDeg() - this.calculateLeadAngleDegrees();
   }
 
-  /** The aim trim in use (deg, + = right): AIM_TRIM_DEG, plus AIM_TRIM_BLUE_SCORING_DEG on the BLUE SCORING CELL. */
+  /** The aim trim in use (deg, + = right): AIM_TRIM_DEG plus the trim of the CELL the turret aims at. */
   public double aimTrimDeg() {
-    boolean blueScoring = aimedCell == cellIndex(AllianceColor.BLUE, HiveTargeting.Cell.SCORING);
-    return AIM_TRIM_DEG + (blueScoring ? AIM_TRIM_BLUE_SCORING_DEG : 0);
+    return AIM_TRIM_DEG + cellTrimDeg(aimedCell);
+  }
+
+  /** The CELL's own trim, by its index (tag id - 30) / 4: 0 red scoring, 1 red audience, 2 blue audience, 3 blue scoring. */
+  private static double cellTrimDeg(int cell) {
+    switch (cell) {
+      case 0:
+        return AIM_TRIM_RED_SCORING_DEG;
+      case 1:
+        return AIM_TRIM_RED_AUDIENCE_DEG;
+      case 2:
+        return AIM_TRIM_BLUE_AUDIENCE_DEG;
+      case 3:
+        return AIM_TRIM_BLUE_SCORING_DEG;
+      default:
+        return 0;                                        // no CELL seen yet
+    }
+  }
+
+  /** The trim of {@code color}'s {@code cell} (deg) and the name of its Panels field, for telemetry. */
+  public static double cellTrimDeg(AllianceColor color, HiveTargeting.Cell cell) {
+    return cellTrimDeg(cellIndex(color, cell));
+  }
+
+  public static String cellTrimName(AllianceColor color, HiveTargeting.Cell cell) {
+    return "AIM_TRIM_" + color + "_" + cell + "_DEG";
   }
 
   public boolean hasValidTarget() {
