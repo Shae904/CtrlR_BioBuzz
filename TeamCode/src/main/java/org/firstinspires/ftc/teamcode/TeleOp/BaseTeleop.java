@@ -99,6 +99,7 @@ public class BaseTeleop {
 
       // FLAPPER: up (feeding) only while triangle is held on either pad, down otherwise
       robot.intake.setFlapper(this.opMode.gamepad2.triangle || this.opMode.gamepad1.triangle);
+      robot.outtake.setFeeding(robot.intake.isFlapperUp());   // for the shot-recovery experiments (Outtake.RECOVERY_MODE)
 
       // FLOWER: gamepad1 dpad down toggles it down / up; gamepad2 cross holds it down
       if (this.opMode.gamepad1.dpadDownWasPressed()) {
@@ -138,13 +139,16 @@ public class BaseTeleop {
       robot.outtake.updatePIDControl();
 
       // INTAKE
+      double intakePower = 0;
       if (this.opMode.gamepad1.right_trigger > 0.05 || this.opMode.gamepad1.left_trigger > 0.05) {
-        robot.intake.setIntakePower(this.opMode.gamepad1.right_trigger - this.opMode.gamepad1.left_trigger);
+        intakePower = this.opMode.gamepad1.right_trigger - this.opMode.gamepad1.left_trigger;
       } else if (this.opMode.gamepad2.right_trigger > 0.05 || this.opMode.gamepad2.left_trigger > 0.05) {
-        robot.intake.setIntakePower(this.opMode.gamepad2.right_trigger - this.opMode.gamepad2.left_trigger);
-      } else {
-        robot.intake.setIntakePower(0);
+        intakePower = this.opMode.gamepad2.right_trigger - this.opMode.gamepad2.left_trigger;
       }
+      if (intakePower > 0 && !robot.outtake.feedAllowed()) {
+        intakePower = 0;   // experiment PACED_FEED only: the next ball waits until the flywheel is back at speed
+      }
+      robot.intake.setIntakePower(intakePower);
 
 
       // TELEMETRY
@@ -284,6 +288,7 @@ public class BaseTeleop {
     telemetry.addData("Vel Target", robot.outtake.getTargetVelocity());
     telemetry.addData("Vel Setpoint", robot.outtake.getSetpoint());   // = Vel Target except during the soft start
     telemetry.addData("At Target", robot.outtake.atTarget());
+    telemetry.addData("Recovery", robot.outtake.recoveryStatus());   // Outtake.RECOVERY_MODE experiment (Panels)
     addTargetTelemetry();
 
     telemetry.update();

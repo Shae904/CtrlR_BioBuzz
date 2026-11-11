@@ -19,6 +19,7 @@ import org.firstinspires.ftc.teamcode.Subsystems.Outtake;
  *   TRIANGLE  feedforward sweep (~40 s): open-loop power steps, fits kS and kV (12 V units) and applies them
  *   SQUARE    step test: target alternates LOW_TARGET / HIGH_TARGET every STEP_PERIOD_S  (tune kP here)
  *   CIRCLE    hold HOLD_TARGET (dpad up/down = +-20); feed POLLEN with right trigger to see shot recovery
+ *             (compare the Outtake.RECOVERY_MODE experiments here: "shots" = each ball's drop and recovery time)
  *   CROSS     stop
  *   triggers  intake (right = feed into the flywheel, left = reverse), in any mode
  * </pre>
@@ -144,7 +145,10 @@ public class FlywheelPIDTesting extends LinearOpMode {
           break;
       }
 
-      intake.setIntakePower(gamepad1.right_trigger - gamepad1.left_trigger);
+      // shot-recovery experiments (Outtake.RECOVERY_MODE): "feeding" = the feed trigger; PACED_FEED may hold the intake
+      outtake.setFeeding(gamepad1.right_trigger > 0.05);
+      double intakePower = gamepad1.right_trigger - gamepad1.left_trigger;
+      intake.setIntakePower(intakePower > 0 && !outtake.feedAllowed() ? 0 : intakePower);
 
       double vel = outtake.flywheel1.getVelocity(); // from this loop's bulk read (no extra hub call)
       double target = mode == Mode.SWEEP ? 0 : outtake.getTargetVelocity();
@@ -161,6 +165,7 @@ public class FlywheelPIDTesting extends LinearOpMode {
       panels.addData("step up", upResult);
       panels.addData("step down", downResult);
       panels.addData("shots", shotResult);
+      panels.addData("recovery", outtake.recoveryStatus());
       panels.update(telemetry);
     }
     outtake.setPower(0);
