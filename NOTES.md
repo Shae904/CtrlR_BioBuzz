@@ -5,7 +5,7 @@ did most of the code since the Pedro 3 upgrade. Treat it as a coworker's notes: 
 not rules. Keep it current: when you change something it describes, change it here too, and add a line to the log at
 the bottom.
 
-Kept current through PR #33 (2026-11-11) unless a section says otherwise.
+Kept current through PR #34 (2026-11-11) unless a section says otherwise.
 
 ---
 
@@ -109,7 +109,7 @@ Every tuner's websocket dropped ~1 s after clicking. The mechanism: the page sen
 
 - `BaseHiveAuto`: shared toolkit. Alliance poses (`fieldPose`), `drive(path, timeout)` + `driveTo` (a short settle path if Pedro stopped >1 in off), Limelight aim with a per-spot aim point (`setAimPoint`), the turret resting toward where the cell will be while driving (tracking a cell behind the robot by odometry ran it into its ±180° limit), `aimUntilReady` (2° and flywheel within 30 ticks/s, held 80 ms), `shoot(n)` one ball per intake pulse, `shootVolley()`, `stopAiming()` before parking. All `@Configurable`.
 - **HIVE 4** (`Hive4/`): start RED (46, 7.36, 90°) / BLUE (95.05, 133.69, 270°) against the audience/rear wall; out to (46, 22), shooting spot **(12, 20)** (CommanderSleepy, comp 1; the sim's was (16.5, 16.5), 1.43 m from the up cell); volley of 4. The 3rd pollen tips (3 nectar already in the cell), the 4th spills; then **parks at (14, 106, 90°)** (comp 1) along a quadratic Bézier through `PARK_VIA_RED` (34, 64) (PR #23: clears the red-wall flower by ~8.4 in and the hive's west foot bar by ~9.0 in while turning; the straight line had 0.05 in at the flower). 20 + LEAVE + PARK.
-- **2 TIP** (`TwoTip/`): same start; shoot 3 → tip; sweep the garden along the audience wall pressed on it (turn at (28, 15), slide to (25, 8.4), sweep to (12.3, 7.0) at 25 in/s) for 3 pollen; curve via (26, 40), (26, 95) to (15.5, 125.9) behind the hive, aim point −1°, shoot 4 into the cell that came up; rear flower (47.5, 117) → (47.5, 126.2) facing it, intake 1 s for its 4 pollen; back to (15.5, 125.9), shoot 4 → second tip (needs 8); park at (17, 106, 90°). 48 points in the sim, both alliances, lockstep and real time.
+- **2 TIP** (`TwoTip/`): same start; shoot 3 → tip; garden (PR #34): the turn to 180° at (28, 18) as its own path, slide straight to (25, 8.6) beside the audience wall (0.2 in off it), **flower arm down** + intake, sweep to (12.3, 8.1) at 25 in/s riding the wall with a light 0.27 in press, arm up (was turn (28, 15) folded into the slide to (25, 8.4), 0.03 in off the wall, and a sweep ending 1.37 in inside the wall: on the robot it did not get there properly); curve from the robot's actual pose via (26, 40), (26, 95) to (15.5, 125.9) behind the hive, shoot 4 into the cell that came up; rear flower (50.5, 117) → (50.5, 126.2) facing it (**3 in to the robot's right** of the old 47.5, PR #34, team: the stack wasn't picked up properly), **flower arm down**, intake 1 s for its 4 pollen, arm up; back to (15.5, 125.9), shoot 4 → second tip (needs 8); park at (17, 106, 90°). 48 points in the sim (old positions). Arm travel `FLOWER_ARM_MS` 250 before each pickup.
 - Spin-up target while driving `SPINUP_TICKS = 1220` (the formula at the shooting spots, PR #30; `Limelight.DEFAULT_SHOT_TICKS` too). The autos open/close the gate through `Intake.setFlapper`.
 - The autos save their Pedro pose every loop (`PoseStorage.saveAutoPose` in `BaseHiveAuto.update`) for the teleop.
 - Limelight in the autos: the alliance pipeline 1/2 (both cells). If you move the autos to per-cell pipelines: HIVE 4 RED shoots the **audience** cell (pipeline 5; it is the red cell that is up at the start), BLUE the **scoring** cell (4); 2 TIP spot B is the other cell (RED 3, BLUE 6).
@@ -152,6 +152,7 @@ Ryan Lim (github `inevident`, commits as `inevident <ryanlimpre@gmail.com>`), te
 
 ## Log (newest first; add a line when you change the robot)
 
+- 2026-11-11: PR #34 2 TIP: flower arm down (`Intake.setFlower`) for the garden sweep and the rear flower, up after each; garden positions fixed (separate turn, reachable wall spot, sweep along the wall instead of 1.37 in into it, next path from the actual pose); rear flower pickup 3 in to the robot's right (x 50.5). (Claude/Ryan)
 - 2026-11-11: PR #33 per-cell aim trims for all four cells (`Limelight.AIM_TRIM_{RED,BLUE}_{SCORING,AUDIENCE}_DEG`, Panels, all 0). (Claude/Ryan)
 - 2026-11-11: PR #32 six flywheel shot-recovery experiments behind `Outtake.RECOVERY_MODE` (Panels dropdown, default OFF, teleop/test only), with ball detection from the speed drop and telemetry; for field testing, not permanent. (Claude/Ryan)
 - 2026-11-11: PR #31 `Limelight.AIM_TRIM_BLUE_SCORING_DEG` (Panels): aim trim only for the BLUE SCORING cell (shots there went to the outside); value still 0, to be tuned on the robot and copied into the code. (Claude/Ryan)

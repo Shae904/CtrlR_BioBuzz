@@ -15,10 +15,10 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
  * <ol>
  *   <li>Out from the audience wall, line up in front of the audience CELL (up at the start, holding its 3 NECTAR) and
  *       shoot 3 preloads: the third POLLEN tips the HIVE. The fourth preload stays in the hopper.</li>
- *   <li>Sweep the GARDEN line along the audience wall with the intake running and the gate shut: 3 more POLLEN fill
- *       the hopper.</li>
+ *   <li>Sweep the GARDEN line along the audience wall with the flower arm down, the intake running and the gate shut:
+ *       3 more POLLEN fill the hopper.</li>
  *   <li>Behind the HIVE: the tip turned the scoring CELL up, opening to the rear. Shoot the 4.</li>
- *   <li>The rear flower: its 4 POLLEN through the bottom retrieval opening.</li>
+ *   <li>The rear flower, flower arm down: its 4 POLLEN through the bottom retrieval opening.</li>
  *   <li>Back to the same spot, shoot the 4: 8 POLLEN tip the HIVE again.</li>
  *   <li>Park in the LOADING ZONE, clear of the wall (LEAVE and PARK are judged when AUTO ends).</li>
  * </ol>
@@ -37,16 +37,26 @@ public class BaseTwoTip extends BaseHiveAuto {
   public static double[] CELL_A_RED = {57.8, 54.8};
 
   /**
-   * RED GARDEN sweep, x in, y in, heading deg: turn with room to spare from the wall, slide down to it, then sweep
-   * toward the red wall with the left side pressed on the audience wall (the robot's left is 8.37 in from its centre),
-   * so the intake's front reaches the line of POLLEN touching the wall. It ends against the corner POLLEN.
+   * RED GARDEN sweep, x in, y in, heading deg (the robot's left side, its wheels, is 8.37 in from its centre):
+   * <ul>
+   *   <li>GARDEN_TURN: the whole turn to 180 happens here, 9.6 in clear of the audience wall, as its own path (it was
+   *       folded into the slide to the wall, so the robot could reach the wall still turning, at an angle).</li>
+   *   <li>GARDEN_WALL: slide straight down beside the wall, 0.2 in off it, so Pedro can reach the end (at 0.03 in, any
+   *       odometry error hit the wall first and the drive waited out its timeout pushing on it).</li>
+   *   <li>GARDEN_END: sweep toward the red wall, closing the last 0.2 in and riding the wall with a light 0.27 in press
+   *       (it was 1.37 in into the wall, so the follower strafed the left wheels into it for the whole sweep and kept
+   *       pushing after). It ends with the front against the corner POLLEN.</li>
+   * </ul>
    */
-  public static double[] GARDEN_TURN_RED = {28.0, 15.0, 180};
-  public static double[] GARDEN_WALL_RED = {25.0, 8.4, 180};
-  public static double[] GARDEN_END_RED = {12.3, 7.0, 180};
+  public static double[] GARDEN_TURN_RED = {28.0, 18.0, 180};
+  public static double[] GARDEN_WALL_RED = {25.0, 8.6, 180};
+  public static double[] GARDEN_END_RED = {12.3, 8.1, 180};
+  public static int WALL_TIMEOUT_MS = 1500;
   public static int SWEEP_TIMEOUT_MS = 1500;
   /** Path speed limit while sweeping the GARDEN and closing in on the flower (in/s). */
   public static double SLOW_SPEED = 25;
+  /** The flower arm's travel down before a pickup starts (ms). */
+  public static int FLOWER_ARM_MS = 250;
 
   /** RED curve from the GARDEN to SHOOT_B (control points, x in, y in): clear of the red-wall flower and the HIVE. */
   public static double[] VIA_1_RED = {26.0, 40.0};
@@ -62,10 +72,11 @@ public class BaseTwoTip extends BaseHiveAuto {
 
   /**
    * RED rear flower (column x 47.13, plate face 4.89 in off the rear wall): in front of it, then the front 0.1 in short
-   * of the plate, where the intake reaches 1.7 in into the bottom retrieval opening. x in, y in, heading deg.
+   * of the plate, where the intake reaches 1.7 in into the bottom retrieval opening. x in, y in, heading deg. x 50.5 =
+   * 3 in to the robot's right of the column line (was 47.5; on the robot it did not pick the stack up properly).
    */
-  public static double[] FLOWER_APPROACH_RED = {47.5, 117.0, 90};
-  public static double[] FLOWER_RED = {47.5, 126.2, 90};
+  public static double[] FLOWER_APPROACH_RED = {50.5, 117.0, 90};
+  public static double[] FLOWER_RED = {50.5, 126.2, 90};
   /** Intake running at the flower: 4 POLLEN, one per feed interval as the stack drops (ms). */
   public static int RETRIEVE_MS = 1000;
 
@@ -106,16 +117,21 @@ public class BaseTwoTip extends BaseHiveAuto {
     phase = "SHOOT 3";
     shoot(3);
 
-    // --- 2. the GARDEN: 3 POLLEN fill the hopper ---
+    // --- 2. the GARDEN: 3 POLLEN fill the hopper (flower arm down) ---
     phase = "GARDEN";
-    drive(Paths.path(Paths.line(shootA, gardenTurn).linear(shootA, gardenTurn),
-        Paths.line(gardenTurn, gardenWall).constant(gardenTurn.heading())), DRIVE_TIMEOUT_MS);
+    driveTo(Paths.line(shootA, gardenTurn).linear(shootA, gardenTurn), DRIVE_TIMEOUT_MS);
+    drive(Paths.line(gardenTurn, gardenWall).constant(gardenTurn.heading()), WALL_TIMEOUT_MS);
+    flowerArm(true);
     intake(true);
-    drive(Paths.line(gardenWall, gardenEnd).constant(gardenWall.heading()).with(slow()), SWEEP_TIMEOUT_MS);
+    waitMs(FLOWER_ARM_MS);
+    Pose atWall = robot.follower.pose();
+    drive(Paths.line(atWall, gardenEnd).constant(gardenEnd.heading()).with(slow()), SWEEP_TIMEOUT_MS);
+    flowerArm(false);
 
     // --- 3. behind the HIVE: shoot 4 into the scoring CELL ---
     phase = "DRIVE B";
-    driveTo(Paths.curve(gardenEnd, fieldPose(VIA_1_RED), fieldPose(VIA_2_RED), shootB).linear(gardenEnd, shootB),
+    Pose atGarden = robot.follower.pose();   // pressed on the wall, not exactly at GARDEN_END
+    driveTo(Paths.curve(atGarden, fieldPose(VIA_1_RED), fieldPose(VIA_2_RED), shootB).linear(atGarden, shootB),
         DRIVE_TIMEOUT_MS);
     intake(false);
     phase = "AIM B";
@@ -124,13 +140,16 @@ public class BaseTwoTip extends BaseHiveAuto {
       shoot(4);
     }
 
-    // --- 4. the rear flower's 4 POLLEN ---
+    // --- 4. the rear flower's 4 POLLEN (flower arm down) ---
     phase = "FLOWER";
     drive(Paths.line(shootB, flowerApproach).linear(shootB, flowerApproach), DRIVE_TIMEOUT_MS);
+    flowerArm(true);
     intake(true);
+    waitMs(FLOWER_ARM_MS);
     drive(Paths.line(flowerApproach, flower).constant(flower.heading()).with(slow()), PRESS_TIMEOUT_MS);
     waitMs(RETRIEVE_MS);
     intake(false);
+    flowerArm(false);
 
     // --- 5. back to SHOOT_B, shoot 4: 8 POLLEN tip the HIVE again ---
     phase = "DRIVE B";
