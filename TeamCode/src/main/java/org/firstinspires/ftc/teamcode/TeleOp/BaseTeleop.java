@@ -223,10 +223,8 @@ public class BaseTeleop {
         cell, requested);
     telemetry.addData("Trims", "speed %+.0f ticks/s (gp2 dpad up/down), aim %+.1f deg (dpad right/left), eta %.3f",
         Limelight.SHOT_TRIM_TICKS, Limelight.AIM_TRIM_DEG, Limelight.SHOT_ETA);
-    if (robot.getAllianceColor() == AllianceColor.BLUE) {
-      telemetry.addData("Blue scoring aim trim", "%+.1f deg (Panels: Limelight.AIM_TRIM_BLUE_SCORING_DEG), in use now %+.1f deg",
-          Limelight.AIM_TRIM_BLUE_SCORING_DEG, robot.limelight.aimTrimDeg());
-    }
+    telemetry.addData("Cell aim trim", "%s %s %+.1f deg (Panels: Limelight.%s)", robot.getAllianceColor(), cell,
+        Limelight.cellTrimDeg(robot.getAllianceColor(), cell), Limelight.cellTrimName(robot.getAllianceColor(), cell));
     if (robot.limelight.hasValidTarget()) {
       telemetry.addData("Aim", "%s: %d tags, turn %+.1f deg, opening %.2f m, aimed within %.1f deg%s",
           robot.limelight.aimSource(), robot.limelight.hiveTagCount, robot.limelight.aimCorrectionDeg(),
