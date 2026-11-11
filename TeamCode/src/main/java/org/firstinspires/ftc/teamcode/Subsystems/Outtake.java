@@ -46,6 +46,43 @@ public class Outtake {
   public static double SOFT_START_BELOW_TICKS = 700;   // "starting up" below this (~30% of the 12 V free speed)
   public static double SOFT_START_MAX_LEAD = 200;      // the ramp never runs further than this ahead of the flywheel
 
+  /**
+   * EXPERIMENTS for the flywheel slowing down during a burst (first ball lands, the next ones fall short): pick ONE in
+   * Panels with RECOVERY_MODE (a dropdown); OFF is the plain controller, exactly as before. Teleop and the test
+   * opmodes only (never in an @Autonomous opmode), and only on a flywheel that is already up and running (not while
+   * the soft start ramps, not below SOFT_START_BELOW_TICKS). Each mode has one strength number below. From mildest to
+   * strongest:
+   * <ul>
+   *   <li>STIFFER_GAIN: kP x RECOVERY_KP_MULT while the flywheel is below its target. Smooth, mild.</li>
+   *   <li>FEED_POWER: + RECOVERY_FEED_POWER while the gate is open, before any ball arrives (pushes ahead of the
+   *       slow-down; the flywheel sits a little above the target while the gate is open with no ball).</li>
+   *   <li>OVERSPEED_AFTER_FIRST_BALL: the first ball is shot as normal; once it is seen leaving, the flywheel aims
+   *       RECOVERY_OVERSPEED_TICKS higher until the gate closes.</li>
+   *   <li>KICK_ON_EACH_BALL: every time a ball is seen leaving, full power for RECOVERY_KICK_MS.</li>
+   *   <li>FULL_POWER_BELOW_TARGET: full power whenever the flywheel is more than RECOVERY_BAND_TICKS below its target
+   *       (bang-bang): the fastest recovery the motors can give.</li>
+   *   <li>PACED_FEED: no change to the flywheel; with the gate open the intake stops pushing while the flywheel is
+   *       more than RECOVERY_READY_TICKS below its target, so the next ball waits for it.</li>
+   * </ul>
+   * "A ball is seen leaving" = with the gate open, the flywheel's speed falls RECOVERY_SHOT_DROP_TICKS from where it
+   * was (the hub reports speed in steps of 20, so 30 means two steps; lower it to 15 if balls are missed, raise it if
+   * it counts balls that are not there). Telemetry "Recovery" shows the mode, the balls seen and the worst drop of
+   * the burst; FLYWHEEL PID TESTING (circle, then feed with the right trigger) reports each shot's drop and recovery
+   * time.
+   */
+  public enum RecoveryMode {
+    OFF, STIFFER_GAIN, FEED_POWER, OVERSPEED_AFTER_FIRST_BALL, KICK_ON_EACH_BALL, FULL_POWER_BELOW_TARGET, PACED_FEED
+  }
+
+  public static RecoveryMode RECOVERY_MODE = RecoveryMode.OFF;
+  public static double RECOVERY_KP_MULT = 4;           // STIFFER_GAIN
+  public static double RECOVERY_FEED_POWER = 0.12;     // FEED_POWER (power, 12 V units)
+  public static double RECOVERY_OVERSPEED_TICKS = 40;  // OVERSPEED_AFTER_FIRST_BALL
+  public static double RECOVERY_KICK_MS = 80;          // KICK_ON_EACH_BALL
+  public static double RECOVERY_BAND_TICKS = 20;       // FULL_POWER_BELOW_TARGET
+  public static double RECOVERY_READY_TICKS = 20;      // PACED_FEED
+  public static double RECOVERY_SHOT_DROP_TICKS = 30;  // ball detection (OVERSPEED_AFTER_FIRST_BALL, KICK_ON_EACH_BALL)
+
 
   public static Direction flywheel1MotorDirection = Direction.FORWARD;
   public static Direction flywheel2MotorDirection = Direction.REVERSE;
@@ -65,8 +102,19 @@ public class Outtake {
   private double lastPower;
   private double setpoint;                             // what the controller aims for (= the target unless ramping)
   private boolean ramping;
-  /** False in @Autonomous opmodes: the autos keep the full-power spin-up (their timing depends on it). */
-  private final boolean softStartAllowed;
+  /** False in @Autonomous opmodes: the autos keep the full-power spin-up and get no recovery experiment. */
+  private final boolean notAutonomous;
+
+  // shot-recovery experiments
+  private boolean feeding;                             // the gate is open (teleop) / the intake is feeding (test opmode)
+  private boolean atSpeedThisBurst;                    // the flywheel was at its target since the gate opened
+  private double dropFrom;                             // the speed a ball's drop is measured from (recent peak)
+  private double lastDetectTarget;
+  private int ballsThisBurst;
+  private double worstDrop;                            // furthest below the target since the gate opened (ticks/s)
+  private double controlSetpoint;                      // what the controller aims for (setpoint, + the overspeed)
+  private RecoveryMode activeMode = RecoveryMode.OFF;
+  private final ElapsedTime sinceBall = new ElapsedTime();
   private final ElapsedTime rampTimer = new ElapsedTime();
 
   private final VoltageSensor battery;
@@ -94,7 +142,7 @@ public class Outtake {
     turret.setMode(RunMode.RUN_WITHOUT_ENCODER);
 
     // the opmode's own class (RedHive4, RedTeleop, ...), so every @Autonomous opmode is excluded
-    softStartAllowed = !opMode.getClass().isAnnotationPresent(Autonomous.class);
+    notAutonomous = !opMode.getClass().isAnnotationPresent(Autonomous.class);
 
     battery = hardwareMap.voltageSensor.iterator().next();
     readBatteryVoltage();
@@ -134,14 +182,37 @@ public class Outtake {
     double dt = Math.min(rampTimer.seconds(), 0.1);      // the first call comes after the whole INIT wait
     rampTimer.reset();
     this.setpoint = softStartSetpoint(dt);
-    double error = this.setpoint - this.currentVelocity;
 
-    double output = (kV * this.setpoint) + (kP * error);
+    // Shot-recovery experiment (RECOVERY_MODE): only on a flywheel that is up and running, never in the autos
+    boolean running = notAutonomous && this.targetVelocity > 0 && !ramping
+        && this.currentVelocity >= SOFT_START_BELOW_TICKS;
+    RecoveryMode mode = running && RECOVERY_MODE != null ? RECOVERY_MODE : RecoveryMode.OFF;
+    this.activeMode = mode;
+    detectBalls(running);
+
+    double aim = this.setpoint;
+    if (mode == RecoveryMode.OVERSPEED_AFTER_FIRST_BALL && feeding && ballsThisBurst > 0) {
+      aim += RECOVERY_OVERSPEED_TICKS;
+    }
+    this.controlSetpoint = aim;
+    double error = aim - this.currentVelocity;
+
+    double gain = mode == RecoveryMode.STIFFER_GAIN && error > 0 ? kP * RECOVERY_KP_MULT : kP;
+    double output = (kV * aim) + (gain * error);
     if (this.targetVelocity > 0) {
       output += kS;
     }
+    if (mode == RecoveryMode.FEED_POWER && feeding) {
+      output += RECOVERY_FEED_POWER;
+    }
     if (VOLTAGE_COMPENSATION) {
       output *= NOMINAL_VOLTAGE / getBatteryVoltage();
+    }
+    if (mode == RecoveryMode.FULL_POWER_BELOW_TARGET && error > RECOVERY_BAND_TICKS) {
+      output = 1.0;
+    }
+    if (mode == RecoveryMode.KICK_ON_EACH_BALL && ballsThisBurst > 0 && sinceBall.milliseconds() < RECOVERY_KICK_MS) {
+      output = 1.0;
     }
 
     // limit power range (a little reverse power brakes the flywheel when the target drops)
@@ -154,7 +225,7 @@ public class Outtake {
 
   /** The target, or while starting up from rest the ramp toward it (SOFT_START). */
   private double softStartSetpoint(double dt) {
-    if (!SOFT_START || !softStartAllowed || this.targetVelocity <= this.setpoint) {
+    if (!SOFT_START || !notAutonomous || this.targetVelocity <= this.setpoint) {
       ramping = false;                                   // lower targets (and no ramp): at once, as before
       return this.targetVelocity;
     }
@@ -174,9 +245,76 @@ public class Outtake {
     return next;
   }
 
-  /** What the controller aims for now: the target, or the soft-start ramp toward it. */
+  /** What the controller aims for now: the target, the soft-start ramp toward it, or the overspeed experiment's. */
   public double getSetpoint() {
-    return this.setpoint;
+    return this.controlSetpoint;
+  }
+
+  // ---- shot-recovery experiments ----------------------------------------------------------------------------------
+
+  /** The gate is open / balls are being fed (teleop: the flapper is up; test opmode: the feed trigger). */
+  public void setFeeding(boolean feeding) {
+    if (feeding && !this.feeding) {                      // a new burst
+      ballsThisBurst = 0;
+      worstDrop = 0;
+      atSpeedThisBurst = false;
+    }
+    this.feeding = feeding;
+  }
+
+  /** After a ball is seen, its drop keeps arriving for this long (the hub measures speed over 50 ms): not a new ball. */
+  private static final double BALL_SETTLE_MS = 70;
+
+  /**
+   * Counts the balls of a burst from the flywheel's speed: a ball is a fall of RECOVERY_SHOT_DROP_TICKS from where the
+   * speed was (its recent peak, or the target if that is lower, so readings above the target don't count), also when
+   * the flywheel had not recovered from the ball before.
+   */
+  private void detectBalls(boolean running) {
+    double target = this.targetVelocity;
+    double v = this.currentVelocity;
+    if (!feeding || !running) {
+      dropFrom = v;                                      // no burst: just follow the speed
+      lastDetectTarget = target;
+      return;
+    }
+    if (target < lastDetectTarget) {
+      dropFrom -= lastDetectTarget - target;             // slowing down for a lower target is not a ball
+    }
+    lastDetectTarget = target;
+    double below = target - v;
+    if (atSpeedThisBurst || below <= RECOVERY_SHOT_DROP_TICKS * 2 / 3) {
+      atSpeedThisBurst = true;
+      worstDrop = Math.max(worstDrop, below);
+    }
+    if (ballsThisBurst > 0 && sinceBall.milliseconds() < BALL_SETTLE_MS) {
+      dropFrom = v;                                      // still the same ball
+      return;
+    }
+    dropFrom = Math.max(dropFrom, v);
+    if (v <= Math.min(dropFrom, target) - RECOVERY_SHOT_DROP_TICKS) {
+      ballsThisBurst++;
+      sinceBall.reset();
+      dropFrom = v;
+    }
+  }
+
+  /**
+   * PACED_FEED: false while the gate is open and the flywheel is more than RECOVERY_READY_TICKS below its target (the
+   * caller then holds the intake); true in every other mode and in the autos.
+   */
+  public boolean feedAllowed() {
+    return !(notAutonomous && RECOVERY_MODE == RecoveryMode.PACED_FEED && feeding && this.targetVelocity > 0
+        && this.targetVelocity - this.currentVelocity > RECOVERY_READY_TICKS);
+  }
+
+  /** For telemetry: the experiment in use, the balls seen this burst and the worst drop below the target. */
+  public String recoveryStatus() {
+    String mode = !notAutonomous ? "off in autos"
+        : RECOVERY_MODE == RecoveryMode.PACED_FEED ? "PACED_FEED" + (feedAllowed() ? "" : " (holding the intake)")
+        : RECOVERY_MODE == activeMode || RECOVERY_MODE == null ? String.valueOf(activeMode)
+        : RECOVERY_MODE + " (waiting: flywheel not up to speed)";
+    return String.format("%s | balls seen %d | worst drop %.0f ticks/s", mode, ballsThisBurst, worstDrop);
   }
 
   public double getLastPower() {
