@@ -274,6 +274,11 @@ public abstract class BaseHiveAuto {
     robot.intake.setIntakePower(on ? INTAKE_POWER : 0);
   }
 
+  /** The flower arm: down (true) for a pickup (the GARDEN, a flower), up (false) the rest of the time. */
+  protected void flowerArm(boolean down) {
+    robot.intake.setFlower(down);
+  }
+
   protected void openGate() {
     robot.intake.setFlapper(true);
   }
