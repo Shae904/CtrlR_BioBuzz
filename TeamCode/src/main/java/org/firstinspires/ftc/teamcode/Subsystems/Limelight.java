@@ -51,6 +51,11 @@ public class Limelight {
   // The CELL opening vs its tags and the camera vs the shot line: AimGeometry (the aim and the formula's distance).
   /** Aim trim (deg, + = right) on top of the geometry: one number for a camera yaw error or a sideways throw. */
   public static double AIM_TRIM_DEG = 0;
+  /**
+   * Extra aim trim (deg, + = right, - = left, as seen from behind the shooter) only while the turret aims at the BLUE
+   * SCORING CELL (tags 42-45, the blue CELL facing the far wall): added to AIM_TRIM_DEG, teleop and autos. Panels.
+   */
+  public static double AIM_TRIM_BLUE_SCORING_DEG = 0;
 
   // --- Shot formula from the CAD + physics model (vibecadded-ftc/shooter-model/DERIVATION.md) ---
   // ticks/s = (d * (SHOT_A * d - SHOT_B)^-0.5 / SHOT_K + SHOT_OFFSET) / SHOT_ETA
@@ -116,6 +121,7 @@ public class Limelight {
 
   // Result of the multi-tag hive detection (see updateHiveTarget)
   private boolean hiveSeen = false;
+  private int aimedCell = -1;        // the CELL the last frame aimed at ((tag id - 30) / 4), -1 before any
   private double aimCorrection = 0;  // turret turn that puts the shot line through the opening (deg, + = right)
   public double tagDistance;         // horizontal camera -> tag cluster centre (m)
   public int hiveTagCount;           // how many of our hive's tags were used
@@ -315,6 +321,7 @@ public class Limelight {
     // CELLS 1 (red, 34-37) and 2 (blue, 38-41) face the audience wall; 0 (30-33) and 3 (42-45) the far wall
     AimGeometry.Aim aim = AimGeometry.solve(clusters[best], best == 1 || best == 2, cameraYawRad);
     this.hiveSeen = true;
+    this.aimedCell = best;
     this.hiveTagCount = count[best];
     this.tagDistance = aim.tagDistanceM;
     this.aimCorrection = aim.correctionDeg;
@@ -423,7 +430,13 @@ public class Limelight {
   }
 
   public double calculateError() {
-    return this.aimCorrection + AIM_TRIM_DEG - this.calculateLeadAngleDegrees();
+    return this.aimCorrection + aimTrimDeg() - this.calculateLeadAngleDegrees();
+  }
+
+  /** The aim trim in use (deg, + = right): AIM_TRIM_DEG, plus AIM_TRIM_BLUE_SCORING_DEG on the BLUE SCORING CELL. */
+  public double aimTrimDeg() {
+    boolean blueScoring = aimedCell == cellIndex(AllianceColor.BLUE, HiveTargeting.Cell.SCORING);
+    return AIM_TRIM_DEG + (blueScoring ? AIM_TRIM_BLUE_SCORING_DEG : 0);
   }
 
   public boolean hasValidTarget() {
