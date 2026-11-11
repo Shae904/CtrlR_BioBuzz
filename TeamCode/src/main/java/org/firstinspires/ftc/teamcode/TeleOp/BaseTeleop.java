@@ -217,8 +217,8 @@ public class BaseTeleop {
     int running = robot.limelight.runningPipeline();
     telemetry.addData("Target CELL", "%s %s, pipeline %d  (gp2 circle/B toggles)", robot.getAllianceColor(),
         cell, requested);
-    telemetry.addData("Trims", "speed %+.0f ticks/s (gp2 dpad up/down), aim %+.1f deg (dpad right/left)%s",
-        Limelight.SHOT_TRIM_TICKS, Limelight.AIM_TRIM_DEG, Limelight.SHOT_MODEL_58_DEG ? ", 58 deg model" : "");
+    telemetry.addData("Trims", "speed %+.0f ticks/s (gp2 dpad up/down), aim %+.1f deg (dpad right/left), eta %.3f",
+        Limelight.SHOT_TRIM_TICKS, Limelight.AIM_TRIM_DEG, Limelight.SHOT_ETA);
     if (robot.limelight.hasValidTarget()) {
       telemetry.addData("Aim", "%s: %d tags, turn %+.1f deg, opening %.2f m, aimed within %.1f deg%s",
           robot.limelight.aimSource(), robot.limelight.hiveTagCount, robot.limelight.aimCorrectionDeg(),

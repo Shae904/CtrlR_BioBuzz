@@ -33,8 +33,8 @@ public class Limelight {
   public static double AIM_RGB_THRESHOLD = 2;
   /** A Limelight result older than this (ms) is no target (camera stopped sending). */
   public static int STALE_MS = 300;
-  /** Flywheel target before the first tag reading (ticks/s): the auto-corner shot (1.54 m), the formula's ~1140. */
-  public static double DEFAULT_SHOT_TICKS = 1150;
+  /** Flywheel target before the first tag reading (ticks/s): the formula at ~1.5 m, where the autos shoot from. */
+  public static double DEFAULT_SHOT_TICKS = 1220;
   /** Teleop pre-aim from odometry: back to the rest direction if no tags are found within this (ms); re-press to retry. */
   public static int ODOMETRY_PREAIM_TIMEOUT_MS = 1500;
   /** The opening of each RED CELL when it is up (in, Pedro): the teleop pre-aim from odometry; BLUE is rotated. */
@@ -53,40 +53,33 @@ public class Limelight {
   public static double AIM_TRIM_DEG = 0;
 
   // --- Shot formula from the CAD + physics model (vibecadded-ftc/shooter-model/DERIVATION.md) ---
-  // ticks/s = d * (SHOT_A * d - SHOT_B)^-0.5 / SHOT_K + SHOT_OFFSET, d = horizontal camera -> CELL opening (m)
-  // Calibrated 2026-10-19 on the robot: 1140 ticks/s scores from the auto corner (camera -> opening 1.54 m), where
-  // the 10-16 fit asked for 1429. The 10-16 fit carried over the DECODE robot's 14% slip loss (eta 0.859) and a small
-  // spring-back (49.8 deg); 1140 is only possible with no slip loss (at 0.859 the ball can't reach the opening at any
-  // launch angle). Model now: no slip loss (eta 1.01, the ball leaves at ~50% of the tire speed), launch 52.6 deg (the
-  // 48 deg hood + 4.6 deg spring-back, as measured on DECODE), launch point 378 mm, 2.80 in POLLEN, opening centre
-  // 1.509 m. Valid ~1.4-3.6 m: 1.54 m -> 1140, 2.0 m -> 1146, 2.5 m -> 1205, 3.0 m -> 1280. Still to confirm with a
-  // shot from ~3 m (if that one lands high, the launch is flatter: refit with the measured speed).
+  // ticks/s = (d * (SHOT_A * d - SHOT_B)^-0.5 / SHOT_K + SHOT_OFFSET) / SHOT_ETA
+  //   d = horizontal camera -> CELL opening (m)
+  // Hood as changed in 2026-11: the ball launches at ~52.6 deg (team measurement). SHOT_A/B/K/OFFSET are the speed a
+  // 52.6 deg launch needs to put a 2.80 in POLLEN through the opening centre (1.509 m up) from the launch point
+  // (378 mm up, 69 mm ahead of the camera), with air drag and backspin lift, IF the ball left at the full rolling
+  // speed between the tire and the hood (5.265 mm/s per tick/s). Fit error < 1 tick/s over 1.4-3.6 m.
   public static double SHOT_A = 0.280894269484;
   public static double SHOT_B = 0.240816326531;
-  public static double SHOT_K = 0.0025098411518;
-  public static double SHOT_OFFSET = -261;
+  public static double SHOT_K = 0.0024778778818;
+  public static double SHOT_OFFSET = -264;
+  /**
+   * Shooter efficiency: the fraction of that rolling speed the ball really leaves with. It scales the whole curve
+   * (every distance by the same ratio), so it is THE number to calibrate on the robot: shots long -> raise it, short ->
+   * lower it; from one spot, new = old x (speed the formula asked for) / (speed that lands).
+   * 0.947 is this shooter's efficiency as last measured: the 2026-10-19 test (1140 ticks/s scored from 1.54 m) taken
+   * at the ~58 deg the old hood launched at (Logger Pro, 2026-10-21); that test's 1140 is NOT a target any more (it
+   * was the old angle). At 52.6 deg this gives 1.4 m -> 1250, 1.54 m -> 1220, 2.0 m -> 1225, 2.5 m -> 1290,
+   * 3.0 m -> 1370. Not yet confirmed with the new hood: 1.00 (no loss at all) would be 1155 at 1.54 m.
+   */
+  public static double SHOT_ETA = 0.947;
   public static double SHOT_MOVE_GAIN = 93 * Math.cos(Math.toRadians(50)); // ticks per m/s toward the goal (DECODE tuning)
-  // POLLEN time of flight to the CELL opening: sqrt(2 * (TOF_A * d - TOF_B) / 9.8) seconds (same model, 2026-10-19)
+  // POLLEN time of flight to the CELL opening at 52.6 deg: sqrt(2 * (TOF_A * d - TOF_B) / 9.8) seconds
   public static double TOF_A = 1.505;
   public static double TOF_B = 1.44;
-
-  /**
-   * The same fit for a 58 deg launch (Logger Pro measured ~58 deg on 2026-10-21; ghettoturret v11 has HoodExitAngle
-   * 53 deg): both give 1140 at the auto corner (1.54 m), the 58 deg one less closer in (1.3 m: 1140 vs 1200) and MORE
-   * farther out (2.0 m: 1200 vs 1140, 2.5 m: 1280 vs 1200). Off: on the robot the shots go over at MEDIUM range after a
-   * full spin-up, where this fit asks for even more (2026-11-04). Panels switch, for experiments only.
-   */
-  public static boolean SHOT_MODEL_58_DEG = false;
-  public static double SHOT58_A = 0.295833167927;
-  public static double SHOT58_B = 0.212244897959;
-  public static double SHOT58_K = 0.0021473714554;
-  public static double SHOT58_OFFSET = -314;
-  public static double SHOT58_MOVE_GAIN = 93 * Math.cos(Math.toRadians(58));
-  public static double TOF58_A = 1.870;
-  public static double TOF58_B = 1.54;
   /** Flywheel trim added to the formula (ticks/s, + = faster): Panels, or gamepad2 dpad up/down in the teleop. */
   public static double SHOT_TRIM_TICKS = 0;
-  /** Closer than this (m, camera to opening) the formula's speed climbs steeply (52.6 deg: 1.2 m -> 1279): warn. */
+  /** Closer than this (m, camera to opening) the formula's speed climbs steeply (1.3 m -> 1290, 1.2 m -> 1370): warn. */
   public static double TOO_CLOSE_M = 1.3;
   /** The 3D distance may differ from the tag-height distance by this fraction before telemetry warns (marker size?). */
   public static double DISTANCE_CHECK_TOLERANCE = 0.15;
@@ -411,12 +404,13 @@ public class Limelight {
    */
   public double calculateTargetVelocity() {
     if (this.hasValidTarget()) {
-      boolean m58 = SHOT_MODEL_58_DEG;
-      double q = (m58 ? SHOT58_A : SHOT_A) * distance - (m58 ? SHOT58_B : SHOT_B);
+      double q = SHOT_A * distance - SHOT_B;
       if (q > 0) {
-        // Shot formula from the CAD + physics model (see SHOT_* constants), plus the field trim
-        double ticks = (distance * Math.pow(q, -0.5)) / (m58 ? SHOT58_K : SHOT_K) + (m58 ? SHOT58_OFFSET : SHOT_OFFSET)
-            - vParallel * (m58 ? SHOT58_MOVE_GAIN : SHOT_MOVE_GAIN) + SHOT_TRIM_TICKS;
+        // Shot formula from the CAD + physics model (see SHOT_* constants) over the shooter's efficiency (kept in a
+        // sane range against a Panels typo), plus the field trim
+        double eta = Range.clip(SHOT_ETA, 0.6, 1.4);
+        double ticks = ((distance * Math.pow(q, -0.5)) / SHOT_K + SHOT_OFFSET) / eta
+            - vParallel * SHOT_MOVE_GAIN + SHOT_TRIM_TICKS;
         lastCalculatedVel = 20.0 * Math.round(ticks / 20.0);
       }
     }
@@ -424,9 +418,7 @@ public class Limelight {
   }
 
   private double calculateLeadAngleDegrees() {
-    double tofA = SHOT_MODEL_58_DEG ? TOF58_A : TOF_A;
-    double tofB = SHOT_MODEL_58_DEG ? TOF58_B : TOF_B;
-    double timeOfFlight = Math.sqrt(Math.max(2 * (tofA * distance - tofB) / 9.8, 0.0025));
+    double timeOfFlight = Math.sqrt(Math.max(2 * (TOF_A * distance - TOF_B) / 9.8, 0.0025));
     return Math.toDegrees(Math.atan((vPerpendicular * timeOfFlight) / distance));
   }
 
