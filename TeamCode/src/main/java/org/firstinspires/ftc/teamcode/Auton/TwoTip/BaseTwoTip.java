@@ -48,9 +48,9 @@ public class BaseTwoTip extends BaseHiveAuto {
    *       pushing after). It ends with the front against the corner POLLEN.</li>
    * </ul>
    */
-  public static double[] GARDEN_TURN_RED = {28.0, 18.0, 180};
-  public static double[] GARDEN_WALL_RED = {25.0, 8.6, 180};
-  public static double[] GARDEN_END_RED = {12.3, 8.1, 180};
+  public static double[] GARDEN_TURN_RED = {28.0, 18.0, 190};
+  public static double[] GARDEN_WALL_RED = {25.0, 11, 190};
+  public static double[] GARDEN_END_RED = {12.3, 10.1, 190};
   public static int WALL_TIMEOUT_MS = 1500;
   public static int SWEEP_TIMEOUT_MS = 1500;
   /** Path speed limit while sweeping the GARDEN and closing in on the flower (in/s). */
@@ -76,7 +76,7 @@ public class BaseTwoTip extends BaseHiveAuto {
    * 3 in to the robot's right of the column line (was 47.5; on the robot it did not pick the stack up properly).
    */
   public static double[] FLOWER_APPROACH_RED = {50.5, 117.0, 90};
-  public static double[] FLOWER_RED = {50.5, 126.2, 90};
+  public static double[] FLOWER_RED = {48.5, 134.2, 90};
   /** Intake running at the flower: 4 POLLEN, one per feed interval as the stack drops (ms). */
   public static int RETRIEVE_MS = 1000;
 
@@ -114,14 +114,13 @@ public class BaseTwoTip extends BaseHiveAuto {
         DRIVE_TIMEOUT_MS);
     phase = "AIM A";
     aimUntilReady(AIM_TIMEOUT_MS);
-    phase = "SHOOT 3";
-    shoot(3);
+    phase = "SHOOT 4";
+    shootVolley();
 
     // --- 2. the GARDEN: 3 POLLEN fill the hopper (flower arm down) ---
     phase = "GARDEN";
     driveTo(Paths.line(shootA, gardenTurn).linear(shootA, gardenTurn), DRIVE_TIMEOUT_MS);
     drive(Paths.line(gardenTurn, gardenWall).constant(gardenTurn.heading()), WALL_TIMEOUT_MS);
-    flowerArm(true);
     intake(true);
     waitMs(FLOWER_ARM_MS);
     Pose atWall = robot.follower.pose();
@@ -137,7 +136,7 @@ public class BaseTwoTip extends BaseHiveAuto {
     phase = "AIM B";
     if (aimUntilReady(AIM_TIMEOUT_MS) || robot.limelight.hasValidTarget()) {
       phase = "SHOOT B 1";
-      shoot(4);
+      shootVolley();
     }
 
     // --- 4. the rear flower's 4 POLLEN (flower arm down) ---
@@ -158,7 +157,7 @@ public class BaseTwoTip extends BaseHiveAuto {
     phase = "AIM B";
     if (aimUntilReady(AIM_TIMEOUT_MS) || robot.limelight.hasValidTarget()) {
       phase = "SHOOT B 2";
-      shoot(4);
+      shootVolley();
     }
 
     // --- 6. park ---

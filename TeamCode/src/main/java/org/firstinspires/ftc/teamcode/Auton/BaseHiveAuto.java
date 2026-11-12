@@ -261,9 +261,9 @@ public abstract class BaseHiveAuto {
 
   /** Shoots the whole hopper in one burst: the intake runs SHOOT_ALL_MS with the gate open. */
   protected void shootVolley() {
-    openGate();
-    waitMs(GATE_OPEN_MS);
     robot.intake.setIntakePower(INTAKE_POWER);
+    waitMs(GATE_OPEN_MS);
+    openGate();
     waitMs(SHOOT_ALL_MS);
     robot.intake.setIntakePower(0);
     closeGate();
