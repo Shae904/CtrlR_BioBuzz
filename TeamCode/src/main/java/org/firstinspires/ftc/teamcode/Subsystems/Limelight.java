@@ -19,12 +19,12 @@ import org.firstinspires.ftc.teamcode.AllianceColor;
 @Configurable
 public class Limelight {
 
-  public static double AIM_Kp = 0.02;
+  public static double AIM_Kp = 0.01;
   public static double AIM_Ki = 0;
-  public static double AIM_Kd = 0.002;
-  public static double AIM_Ks = 0.04;
+  public static double AIM_Kd = 0.0005;
+  public static double AIM_Ks = 0.08;
 
-  public static double AIM_DEADBAND = .3;
+  public static double AIM_DEADBAND = .5;
   /** Turret power per deg/s of the target's own motion (the robot turning), feed-forward. ~1/free speed (~1040 deg/s). */
   public static double AIM_Kv = 0.0008;
 
@@ -80,7 +80,7 @@ public class Limelight {
    * was the old angle). At 52.6 deg this gives 1.4 m -> 1250, 1.54 m -> 1220, 2.0 m -> 1225, 2.5 m -> 1290,
    * 3.0 m -> 1370. Not yet confirmed with the new hood: 1.00 (no loss at all) would be 1155 at 1.54 m.
    */
-  public static double SHOT_ETA = 0.947;
+  public static double SHOT_ETA = 1.01;
   public static double SHOT_MOVE_GAIN = 93 * Math.cos(Math.toRadians(50)); // ticks per m/s toward the goal (DECODE tuning)
   // POLLEN time of flight to the CELL opening at 52.6 deg: sqrt(2 * (TOF_A * d - TOF_B) / 9.8) seconds
   public static double TOF_A = 1.505;

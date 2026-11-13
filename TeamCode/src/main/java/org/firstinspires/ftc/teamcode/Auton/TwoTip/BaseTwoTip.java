@@ -48,9 +48,9 @@ public class BaseTwoTip extends BaseHiveAuto {
    *       pushing after). It ends with the front against the corner POLLEN.</li>
    * </ul>
    */
-  public static double[] GARDEN_TURN_RED = {28.0, 18.0, 190};
-  public static double[] GARDEN_WALL_RED = {25.0, 11, 190};
-  public static double[] GARDEN_END_RED = {12.3, 10.1, 190};
+  public static double[] GARDEN_TURN_RED = {28.0, 18.0, 225};
+  public static double[] GARDEN_WALL_RED = {25.0, 16, 225};
+  public static double[] GARDEN_END_RED = {12.3, 16, 225};
   public static int WALL_TIMEOUT_MS = 1500;
   public static int SWEEP_TIMEOUT_MS = 1500;
   /** Path speed limit while sweeping the GARDEN and closing in on the flower (in/s). */
@@ -75,8 +75,8 @@ public class BaseTwoTip extends BaseHiveAuto {
    * of the plate, where the intake reaches 1.7 in into the bottom retrieval opening. x in, y in, heading deg. x 50.5 =
    * 3 in to the robot's right of the column line (was 47.5; on the robot it did not pick the stack up properly).
    */
-  public static double[] FLOWER_APPROACH_RED = {50.5, 117.0, 90};
-  public static double[] FLOWER_RED = {48.5, 134.2, 90};
+  public static double[] FLOWER_APPROACH_RED = {51.5, 117.0, 90};
+  public static double[] FLOWER_RED = {51.5, 137.2, 90};
   /** Intake running at the flower: 4 POLLEN, one per feed interval as the stack drops (ms). */
   public static int RETRIEVE_MS = 1000;
 

@@ -24,12 +24,12 @@ public class Intake {
    * autos); DOWN = shut, the hopper holds its balls while intaking. It starts DOWN at INIT. Live-tunable in Panels.
    * Measured on the slapper 2026-10-22 (CommanderSleepy): 0.27 up, 0.1 down.
    */
-  public static double FLAPPER_UP = 0.17;
+  public static double FLAPPER_UP = 0.62;
 
-  public static double FLAPPER_DOWN = 0.04;
+  public static double FLAPPER_DOWN = 0.76;
 
   public static double FLOWER_UP = 0.4;
-  public static double FLOWER_DOWN = 0.87;
+  public static double FLOWER_DOWN = 0.81;
   public static double FLOWER_START = 0.4;
 
   public final ServoImplEx gate,flower;

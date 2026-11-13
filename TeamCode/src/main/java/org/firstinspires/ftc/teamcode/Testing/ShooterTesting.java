@@ -88,8 +88,11 @@ public class ShooterTesting extends LinearOpMode {
       outtake.setFeeding(gateUp);                       // the recovery experiments see the gate, as in the teleop
       double power = outtake.updatePIDControl();
       outtake.setPowerTurret(0);
-      double intakePower = gamepad1.right_trigger;
-      intake.setIntakePower(intakePower > 0 && !outtake.feedAllowed() ? 0 : intakePower);
+      double intakePower = 0;
+      if (gamepad1.right_trigger > 0.05 || gamepad1.left_trigger > 0.05) {
+        intakePower = gamepad1.right_trigger - gamepad1.left_trigger;
+      }
+      intake.setIntakePower(intakePower);
 
       double vel = outtake.getCurrentVelocity();        // read by updatePIDControl from this loop's bulk read
       double target = outtake.getTargetVelocity();
