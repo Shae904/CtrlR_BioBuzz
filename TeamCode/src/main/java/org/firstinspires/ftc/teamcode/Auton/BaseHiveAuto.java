@@ -56,7 +56,7 @@ public abstract class BaseHiveAuto {
   public static double FLYWHEEL_TOLERANCE = 30;
   public static int READY_HOLD_MS = 80;
   /** Give up waiting for "ready" after this long at the shooting spot (ms). */
-  public static int AIM_TIMEOUT_MS = 2000;
+  public static int AIM_TIMEOUT_MS = 1250;
   /** {@link #driveTo}: when Pedro stopped further than this from the end (in), a short straight path onto it. */
   public static double SETTLE_IN = 1.0;
   public static int SETTLE_TIMEOUT_MS = 1200;
