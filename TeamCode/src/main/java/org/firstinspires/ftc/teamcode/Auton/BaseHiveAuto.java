@@ -14,6 +14,7 @@ import org.firstinspires.ftc.teamcode.Auton.Hive4.BaseHive4;
 import org.firstinspires.ftc.teamcode.Auton.TwoTip.BaseTwoTip;
 import org.firstinspires.ftc.teamcode.Robot;
 import org.firstinspires.ftc.teamcode.Subsystems.Intake;
+import org.firstinspires.ftc.teamcode.Subsystems.TurretTracker;
 
 /**
  * What the BIOBUZZ autonomous routines ({@link BaseHive4}, {@link BaseTwoTip}) share: alliance poses, driving with a
@@ -79,6 +80,8 @@ public abstract class BaseHiveAuto {
   protected final Telemetry telemetry;
   protected String phase = "INIT";
   private boolean aiming = true;
+  /** {@link #preAim}: while the tags aren't in view the turret points at this CELL (from odometry); null = its rest. */
+  private Pose preAimCell;
   private boolean readyNow;
   private final ElapsedTime readyFor = new ElapsedTime();
 
@@ -138,6 +141,22 @@ public abstract class BaseHiveAuto {
 
   // ---- the loop ----------------------------------------------------------------------------------------------------
 
+  /**
+   * Until the Limelight sees our upward CELL, point the turret at {@code cell} (its opening, from odometry) instead of
+   * its rest direction; null goes back to the rest. For shooting spots where the CELL is not in the rest direction (the
+   * 2 TIP head-on spots, where it is nearly straight ahead), so the camera finds the tags.
+   */
+  protected void preAim(Pose cell) {
+    preAimCell = cell;
+  }
+
+  /** Turret position (deg, 180 = forward) that points at {@code cell} from the robot's pose now. */
+  private double turretToward(Pose cell) {
+    Pose p = robot.follower.pose();
+    double bearing = TurretTracker.openingBearingDeg(p.x(), p.y(), p.heading(), cell.x(), cell.y());
+    return TurretTracker.targetFromBearing(Math.toDegrees(p.heading()), bearing);
+  }
+
   /** Done shooting: the turret goes back to its rest direction (the team's updateTarget without aim) and the flywheel stops. */
   protected void stopAiming() {
     aiming = false;
@@ -153,7 +172,7 @@ public abstract class BaseHiveAuto {
     if (aiming && robot.limelight.hasValidTarget()) {
       robot.outtake.setTargetVelocity(robot.limelight.calculateTargetVelocity());
     } else if (aiming) {
-      robot.limelight.setTarget(robot.getAllianceColor().getSteadyState());
+      robot.limelight.setTarget(preAimCell == null ? robot.getAllianceColor().getSteadyState() : turretToward(preAimCell));
     }
     robot.follower.update();
     PoseStorage.saveAutoPose(robot.follower.pose());   // the TELEOP starts from here

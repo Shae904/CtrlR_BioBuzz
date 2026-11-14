@@ -5,7 +5,7 @@ did most of the code since the Pedro 3 upgrade. Treat it as a coworker's notes: 
 not rules. Keep it current: when you change something it describes, change it here too, and add a line to the log at
 the bottom.
 
-Kept current through PR #38 (2026-11-14) unless a section says otherwise.
+Kept current through PR #39 (2026-11-14) unless a section says otherwise.
 
 ---
 
@@ -179,6 +179,11 @@ Vihaan (CommanderSleepy) now works with his own Claude session ("Vihaan's Claude
 
 **PR #38 (2026-11-14)**: BLUE HIVE 4 back on its comp 1 spot, exactly as before PR #37 (`BaseHive4.SHOOT_BLUE_AS_RED` (12, 20), in RED coordinates, rotated for BLUE; its robot corner is 0.64 in into the blue wall there, as it always was). New opmode **`EXP_BLUE HIVE 4`** (`Hive4/ExpBlueHive4`): same start and routine, shoots from `SHOOT_RED` (13.2, 20) rotated, 0.5 in off the wall. RED HIVE 4 stays on (13.2, 20). The only other BLUE change from PR #37 is the 2 TIP garden's dead 250 ms wait being gone.
 
+**PR #39 (2026-11-14): 2 TIP head-on, through the middle of the HIVE structure**
+- `RED/BLUE 2 TIP` now: shoot all 4 **from the start pose** (facing the HIVE; the turret pre-aims at the audience CELL from odometry, `BaseHiveAuto.preAim`, since the CELL is ~14° right of straight ahead, not at the turret's rest), garden as before, then a curve **under the HIVE structure** (`CENTER_VIA_1/2_RED` (80, 10), (74, 55); the structure only has floor bars on its west/east sides, x 45.8 / 95.3, and its lowest point is ~30.6 in up, the robot 17.8 in; robot outline 8.7 in from the west bar, 10.6 in from the east, 6.3 in from the nearest A-frame leg) to **spot B = the start pose mirrored through the HIVE pivot** (`PIVOT_RED` (57.78, 70.52), heading + 180): from RED's start (46, 7.36, 90°) that is (69.57, 133.69, 270°), back on the rear wall, the same 1.24 m and 14° to the scoring CELL as the start has to the audience CELL. (Mirroring y only would put the robot on the red rear flower.) Rear flower and park as before, leaving and returning to B via a point 9.7 in out from the wall (`B_PULL_OUT_IN`). First volley waits up to `AIM_A_TIMEOUT_MS` 2500 (flywheel from rest); `CENTER_TIMEOUT_MS` 7000 for the ~150 in curve.
+- The previous route is kept as `RED/BLUE 2 TIP OLD` (same class, `oldRoute` flag; its spots are `OLD_SHOOT_A/B_RED`, `OLD_VIA_*`).
+- Teleop: the gamepad1 dpad-right CELL toggle (e9ce16b) read the held state, so holding it toggled every loop; now one toggle per press (`dpadRightWasPressed`), rumbling the pad that pressed.
+
 **Open issues (2026-11-13, not fixed yet)**
 - **Turret lock-on is slow.** `updateAimPID` clips the error derivative to ±50°/s (kept from the DECODE code), while the turret turns ~1000°/s, so the D term is almost always clipped and never exceeds 50 × Kd = 0.025 power. With practically no damping, Kp has to stay low to avoid overshoot. Proposed fix: take D from the turret encoder's measured velocity, without the clip, then retune Kd and raise Kp.
 - Auto "ready" check: `FLYWHEEL_TOLERANCE 30` trips easily, since the hub reports speed in steps of 20 and the formula's target moves in steps of 20. (Correction, Ryan's Claude 11-14: speed readings and targets are both multiples of 20 and `atTarget` is a strict `<`, so 30 and 40 both accept only 0 or ±20; to also accept ±40 it takes 50 or more.) `READY_HOLD_MS` (80) and `AIM_TOLERANCE_DEG` (2.0) could also loosen; the opening leaves ~±5° from the auto spots.
@@ -188,6 +193,8 @@ Vihaan (CommanderSleepy) now works with his own Claude session ("Vihaan's Claude
 ---
 
 ## Log (newest first; add a line when you change the robot)
+
+- 2026-11-14: PR #39 2 TIP head-on: shoot from the start pose, curve under the HIVE structure to the start mirrored through the HIVE pivot; old route kept as `2 TIP OLD`; auto turret pre-aim (`preAim`); gp1 dpad-right CELL toggle fixed to one per press. (Ryan's Claude/Ryan)
 
 - 2026-11-14: PR #38 BLUE HIVE 4 back on its comp 1 spot (12, 20); new `EXP_BLUE HIVE 4` on (13.2, 20); RED unchanged from PR #37. (Ryan's Claude/Ryan)
 
