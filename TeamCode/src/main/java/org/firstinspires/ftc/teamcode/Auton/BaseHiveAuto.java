@@ -46,7 +46,7 @@ public abstract class BaseHiveAuto {
   public static double FIELD_IN = 141.05;
 
   /** Flywheel target while driving (ticks/s), until the Limelight gives the formula's (~1220-1230 at the shooting spots). */
-  public static double SPINUP_TICKS = 1220;
+  public static double SPINUP_TICKS = 1160;
   /**
    * Ready to shoot: turret within this of its aim (deg) and the flywheel within this of its target, held
    * for READY_HOLD_MS, so a turret swinging through the aim point is not ready. The CELL opening is ~20 in wide and 2
@@ -56,20 +56,20 @@ public abstract class BaseHiveAuto {
   public static double FLYWHEEL_TOLERANCE = 30;
   public static int READY_HOLD_MS = 80;
   /** Give up waiting for "ready" after this long at the shooting spot (ms). */
-  public static int AIM_TIMEOUT_MS = 3000;
+  public static int AIM_TIMEOUT_MS = 2000;
   /** {@link #driveTo}: when Pedro stopped further than this from the end (in), a short straight path onto it. */
   public static double SETTLE_IN = 1.0;
   public static int SETTLE_TIMEOUT_MS = 1200;
 
   /** Gate travel before the intake starts feeding (ms). */
-  public static int GATE_OPEN_MS = 200;
+  public static int GATE_OPEN_MS = 0;
   /** With the gate open, the first ball reaches the flywheel this long after the intake starts, then one every FEED_INTERVAL_MS. */
   public static int FEED_FIRST_MS = 150;
   public static int FEED_INTERVAL_MS = 233;
   /** Feeding stops this long after the last wanted ball: under half a feed interval, so the next one stays (ms). */
   public static int FEED_MARGIN_MS = 110;
   /** {@link #shootVolley()}: intake running with the gate open while the whole hopper goes (ms). */
-  public static int SHOOT_ALL_MS = 1600;
+  public static int SHOOT_ALL_MS = 2600;
   /** {@link #shoot(int)}: longest wait for "ready" before each ball (ms). */
   public static int SHOT_READY_TIMEOUT_MS = 1000;
   public static double INTAKE_POWER = Intake.POWER_INTAKE;

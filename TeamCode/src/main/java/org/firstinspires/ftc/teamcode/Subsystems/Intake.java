@@ -26,13 +26,15 @@ public class Intake {
    */
   public static double FLAPPER_UP = 0.62;
 
-  public static double FLAPPER_DOWN = 0.76;
+  public static double FLAPPER_DOWN = 0.78;
 
-  public static double FLOWER_UP = 0.4;
+  public static double FLOWER_UP = 0.3;
   public static double FLOWER_DOWN = 0.81;
-  public static double FLOWER_START = 0.4;
+  public static double FLOWER_TWO_UP = -0.01;
+  public static double FLOWER_TWO_DOWN = -0.01;
 
-  public final ServoImplEx gate,flower;
+
+  public final ServoImplEx gate,flower,flower2;
   private boolean flapperUp;
   private boolean flowerDown;
 
@@ -46,6 +48,7 @@ public class Intake {
 
     gate = hardwareMap.get(ServoImplEx.class, "flapper");
     flower = hardwareMap.get(ServoImplEx.class, "flower");
+    flower2 = hardwareMap.get(ServoImplEx.class, "flower2");
     setFlapper(false); // starts DOWN (shut)
     setFlowerStart();  // starts UP
   }
@@ -57,10 +60,10 @@ public class Intake {
   }
   public void setFlower(boolean down) {
     flowerDown = down;
-    flower.setPosition(down ? FLOWER_DOWN : FLOWER_UP);
+    setFlowerPos(down ? FLOWER_DOWN : FLOWER_UP,down ? FLOWER_TWO_DOWN : FLOWER_TWO_UP);
   }
   public void setFlowerStart(){
-    flower.setPosition(FLOWER_START);
+    setFlowerPos(FLOWER_UP,FLOWER_TWO_UP);
   }
 
   public boolean isFlapperUp() {
@@ -71,7 +74,10 @@ public class Intake {
   public void setFlapperPos(double pos) {
     gate.setPosition(pos);
   }
-  public void setFlowerPos(double pos) {flower.setPosition(pos);}
+  public void setFlowerPos(double pos,double pos2) {
+    flower.setPosition(pos);
+    flower2.setPosition(pos2);
+  }
 
   public void setIntakePower(double pow) {
     intakeMotor.setPower(pow);
