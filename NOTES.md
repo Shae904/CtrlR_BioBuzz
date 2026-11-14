@@ -154,7 +154,7 @@ Vihaan (CommanderSleepy) now works with his own Claude session ("Vihaan's Claude
 
 **Values that replace ones quoted above**
 - Flapper: `FLAPPER_UP 0.62` / `FLAPPER_DOWN 0.78`. The servo now runs the other way (it was 0.17 / 0.04). The comment above them in `Intake.java` still gives the 10-22 numbers.
-- Flower: `FLOWER_UP 0.3`, `FLOWER_DOWN 0.81`. `FLOWER_START` is gone: the arm starts at `FLOWER_UP`.
+- Flower: `FLOWER_UP 0.3`, `FLOWER_DOWN 0.74` (0.87 → 0.81 on 11-12, 0.74 on 11-13). `FLOWER_START` is gone: the arm starts at `FLOWER_UP`.
 - **Second flower servo `flower2`** (2026-11-13): `Intake` reads it at construction, so it **must exist in the robot configuration** or every opmode fails at INIT. `setFlower` / `setFlowerStart` move both servos; `setFlowerPos(pos, pos2)` now takes both. `FLOWER_TWO_UP` / `FLOWER_TWO_DOWN` are both −0.01 for now, which are placeholders: the SDK clips them to 0, so `flower2` doesn't move yet. Hardware map names are now §2's list + `flower2`.
 - Turret aim PID (89234e9): `AIM_Kp 0.01`, `AIM_Kd 0.0005`, `AIM_Ks 0.08`, `AIM_DEADBAND 0.5`. The old values (0.02 / 0.002 / 0.04 / 0.3) were last season's (DECODE).
 - `SHOT_ETA 1.01` (89234e9), up from 0.947. The formula now gives camera→opening 1.40 m 1171, 1.45 m 1159, 1.50 m 1149, 1.55 m 1143 ticks/s. The comment above `SHOT_ETA` in `Limelight.java` still describes 0.947.
@@ -179,7 +179,7 @@ Vihaan (CommanderSleepy) now works with his own Claude session ("Vihaan's Claude
 
 ## Log (newest first; add a line when you change the robot)
 
-- 2026-11-13: autos: `SPINUP_TICKS` 1220 → 1160, `AIM_TIMEOUT_MS` 3000 → 2000, `GATE_OPEN_MS` 200 → 0, `SHOOT_ALL_MS` 1600 → 2600. 2 TIP: garden at heading 180 (y 12, end x 11.3), rear flower at x 44.5 (pickup y 127.2). `FLAPPER_DOWN` 0.78, `FLOWER_UP` 0.3, second flower servo `flower2` (placeholder positions), `MOTOR TESTING` renamed `SERVO&MOTOR TESTING`. NOTES §11 added. (Vihaan / Vihaan's Claude)
+- 2026-11-13: autos: `SPINUP_TICKS` 1220 → 1160, `AIM_TIMEOUT_MS` 3000 → 2000, `GATE_OPEN_MS` 200 → 0, `SHOOT_ALL_MS` 1600 → 2600. 2 TIP: garden at heading 180 (y 12, end x 11.3), rear flower at x 44.5 (pickup y 127.2). `FLAPPER_DOWN` 0.78, `FLOWER_UP` 0.3, `FLOWER_DOWN` 0.74, second flower servo `flower2` (placeholder positions), `MOTOR TESTING` renamed `SERVO&MOTOR TESTING`. NOTES §11 added. (Vihaan / Vihaan's Claude)
 - 2026-11-12: CommanderSleepy (89234e9): turret aim PID tuned (Kp 0.01, Kd 0.0005, Ks 0.08, deadband 0.5), `SHOT_ETA` 1.01, flapper reversed (0.62 / 0.76), `FLOWER_DOWN` 0.81, SHOOTER TESTING intake no longer gated (left trigger reverses), 2 TIP garden at 225° and rear flower at x 51.5 / y 137.2. Recorded by Vihaan's Claude.
 - 2026-11-11: CommanderSleepy (348e1ed): 2 TIP shoots every volley with `shootVolley()` (4 at spot A), flower arm not lowered for the garden, garden at 190°, rear flower moved; `shootVolley` starts the intake before opening the gate. Recorded by Vihaan's Claude.
 - 2026-11-12: PR #36 `SHOOTER TESTING` on the flywheel's velocity controller (target on the dpad, circle/cross start/stop, recovery experiments active) instead of open-loop power. (Claude/Ryan)
