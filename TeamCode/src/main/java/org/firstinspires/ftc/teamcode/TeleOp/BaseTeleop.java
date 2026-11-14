@@ -161,7 +161,7 @@ public class BaseTeleop {
    * SDK sets the PS and Xbox names from the same physical button, so this works on either controller.
    */
   private void updateCellTarget() {
-    if (this.opMode.gamepad2.circleWasPressed()) {
+    if (this.opMode.gamepad2.circleWasPressed() || this.opMode.gamepad1.dpad_right) {
       cell = cell == HiveTargeting.Cell.AUDIENCE ? HiveTargeting.Cell.SCORING : HiveTargeting.Cell.AUDIENCE;
       this.opMode.gamepad2.rumble(150);
     }
