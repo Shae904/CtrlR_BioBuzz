@@ -5,7 +5,7 @@ did most of the code since the Pedro 3 upgrade. Treat it as a coworker's notes: 
 not rules. Keep it current: when you change something it describes, change it here too, and add a line to the log at
 the bottom.
 
-Kept current through PR #37 (2026-11-14) unless a section says otherwise.
+Kept current through PR #38 (2026-11-14) unless a section says otherwise.
 
 ---
 
@@ -172,10 +172,12 @@ Vihaan (CommanderSleepy) now works with his own Claude session ("Vihaan's Claude
 
 **PR #37 (2026-11-14, Ryan's Claude, comp eve)**
 - **Turret rest is the robot's right (270) for both alliances**: `AllianceColor.RED.getSteadyState()` 90 → 270. The left side (the battery side) shot less consistently in testing. **At INIT the turret must point RIGHT on both alliances** (teleop and auto INIT telemetry say so, from `AllianceColor.turretRestName()`). RED autos now shoot with the cell on the turret's right, so RED's routes are BLUE's rotated 180° exactly (same headings relative to the field). Robot outline swept along every RED path: all clear except as noted below; the 2 TIP turn away from the rear flower, which clipped the flower plate by ~1 in with the turret on the left, now clears it by 0.3 in.
-- HIVE 4 `SHOOT_RED` (12, 20) → **(13.2, 20)** (both alliances): with the turret on the right the robot's front-left corner was 0.64 in into the red wall at (12, 20) (BLUE's already was, at its mirrored spot); now 0.5 in off it. 1.44 m from the opening (was 1.46).
+- HIVE 4 `SHOOT_RED` (12, 20) → **(13.2, 20)** (RED; since PR #38 BLUE HIVE 4 keeps (12, 20) as `SHOOT_BLUE_AS_RED` and the new `EXP_BLUE HIVE 4` tries 13.2): with the turret on the right the robot's front-left corner was 0.64 in into the red wall at (12, 20) (BLUE's already was, at its mirrored spot); now 0.5 in off it. 1.44 m from the opening (was 1.46).
 - 2 TIP: removed the 250 ms wait at the garden (it waited for the flower arm, which no longer lowers there) and the no-op arm raise after the sweep. Stale Javadoc/comments updated (2 TIP routine and positions, `SHOT_ETA`, flapper, `SPINUP_TICKS`).
 - **New autos `CLOSE RED 4` / `CLOSE BLUE 4`** (`Auton/Close4`): start in the corner beside our LOADING ZONE (RED (7.36, 132.68, 0°): back on the red wall, left side on the rear wall; BLUE rotated: (133.69, 8.37, 180°)), drive to 2 TIP's scoring-cell spot (15.5, 125.9) with the cell on the turret's right, wait until the Limelight sees our cell on this side **up** (RED SCORING 30–33 / BLUE AUDIENCE 38–41: down at the start, up after a partner's tip; a down cell never counts), up to `SEE_DEADLINE_S` 27 s after START, then `aimUntilReady` + `shootVolley` (4) and park at (17, 106, 90°) in the LOADING ZONE. Not seen by 27 s: park without shooting. A cell first seen after ~25 s still gets the volley, and the park then ends after AUTO.
 - Not changed on purpose (comp tomorrow): turret aim derivative clip, `FLYWHEEL_TOLERANCE`, `Limelight.DEFAULT_SHOT_TICKS` (still 1220; the formula gives ~1140–1180 with `SHOT_ETA` 1.01), `flower2` required in the configuration.
+
+**PR #38 (2026-11-14)**: BLUE HIVE 4 back on its comp 1 spot, exactly as before PR #37 (`BaseHive4.SHOOT_BLUE_AS_RED` (12, 20), in RED coordinates, rotated for BLUE; its robot corner is 0.64 in into the blue wall there, as it always was). New opmode **`EXP_BLUE HIVE 4`** (`Hive4/ExpBlueHive4`): same start and routine, shoots from `SHOOT_RED` (13.2, 20) rotated, 0.5 in off the wall. RED HIVE 4 stays on (13.2, 20). The only other BLUE change from PR #37 is the 2 TIP garden's dead 250 ms wait being gone.
 
 **Open issues (2026-11-13, not fixed yet)**
 - **Turret lock-on is slow.** `updateAimPID` clips the error derivative to ±50°/s (kept from the DECODE code), while the turret turns ~1000°/s, so the D term is almost always clipped and never exceeds 50 × Kd = 0.025 power. With practically no damping, Kp has to stay low to avoid overshoot. Proposed fix: take D from the turret encoder's measured velocity, without the clip, then retune Kd and raise Kp.
@@ -186,6 +188,8 @@ Vihaan (CommanderSleepy) now works with his own Claude session ("Vihaan's Claude
 ---
 
 ## Log (newest first; add a line when you change the robot)
+
+- 2026-11-14: PR #38 BLUE HIVE 4 back on its comp 1 spot (12, 20); new `EXP_BLUE HIVE 4` on (13.2, 20); RED unchanged from PR #37. (Ryan's Claude/Ryan)
 
 - 2026-11-14: PR #37 turret rest = the robot's right for both alliances (RED 90 → 270; point it RIGHT at INIT), RED autos mirror BLUE's; HIVE 4 spot x 12 → 13.2 (off the red wall); 2 TIP dead garden wait removed; new `CLOSE RED 4` / `CLOSE BLUE 4`; stale comments fixed. (Ryan's Claude/Ryan)
 

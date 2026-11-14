@@ -5,6 +5,7 @@ import com.pedropathing.api.Paths;
 import com.pedropathing.math.Pose;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 
+import org.firstinspires.ftc.teamcode.AllianceColor;
 import org.firstinspires.ftc.teamcode.Auton.BaseHiveAuto;
 import org.firstinspires.ftc.teamcode.Auton.TwoTip.BaseTwoTip;
 import org.firstinspires.ftc.teamcode.Robot;
@@ -22,9 +23,15 @@ public class BaseHive4 extends BaseHiveAuto {
   /**
    * RED shooting spot, x in, y in: 1.44 m from the CELL opening, clear of the garden pollen. 13.2 (was 12, comp 1):
    * with the turret on the robot's right (both alliances since 2026-11-14) the robot's front-left corner is 0.5 in off
-   * the red wall here; at 12 it was 0.64 in into it (BLUE's has been, at its mirrored spot).
+   * the red wall here; at 12 it was 0.64 in into it. EXP_BLUE HIVE 4 uses this spot too (rotated).
    */
   public static double[] SHOOT_RED = {13.2, 20};
+  /**
+   * BLUE HIVE 4's shooting spot, written in RED coordinates (rotated for BLUE like every pose): the comp 1 spot, kept
+   * exactly as it was. Here BLUE's robot has its front-left corner 0.64 in into the blue wall; EXP_BLUE HIVE 4 tries
+   * SHOOT_RED's 13.2 instead.
+   */
+  public static double[] SHOOT_BLUE_AS_RED = {12, 20};
   /** RED upward CELL opening (the audience CELL at the start), x in, y in. */
   public static double[] CELL_RED = {57.8, 54.8};
 
@@ -36,13 +43,26 @@ public class BaseHive4 extends BaseHiveAuto {
    */
   public static double[] PARK_VIA_RED = {34.0, 64.0};
 
+  /** EXP_BLUE HIVE 4: BLUE on SHOOT_RED's spot instead of SHOOT_BLUE_AS_RED. */
+  private final boolean experimental;
+
   public BaseHive4(LinearOpMode opMode, Robot robot) {
+    this(opMode, robot, false);
+  }
+
+  public BaseHive4(LinearOpMode opMode, Robot robot, boolean experimental) {
     super(opMode, robot);
+    this.experimental = experimental;
+  }
+
+  /** The shooting spot in RED coordinates: BLUE keeps its comp 1 spot unless experimental. */
+  private double[] shootSpot() {
+    return robot.getAllianceColor() == AllianceColor.BLUE && !experimental ? SHOOT_BLUE_AS_RED : SHOOT_RED;
   }
 
   @Override
   public void run() {
-    if (!initAndWaitForStart("HIVE 4: out, line up, shoot 4")) {
+    if (!initAndWaitForStart((experimental ? "EXPERIMENTAL " : "") + "HIVE 4: out, line up, shoot 4")) {
       return;
     }
     Pose cell = fieldPose(CELL_RED);
@@ -51,7 +71,7 @@ public class BaseHive4 extends BaseHiveAuto {
     phase = "DRIVE";
     Pose start = robot.follower.pose();
     Pose out = fieldPose(OUT_RED).withHeading(start.heading());
-    Pose shoot = shootingPose(SHOOT_RED, cell);
+    Pose shoot = shootingPose(shootSpot(), cell);
     robot.outtake.setTargetVelocity(SPINUP_TICKS);
     drive(Paths.path(Paths.line(start, out).constant(start.heading()), Paths.line(out, shoot).linear(out, shoot)), 6000);
 
