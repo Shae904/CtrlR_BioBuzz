@@ -27,10 +27,10 @@ import org.firstinspires.ftc.teamcode.Subsystems.Intake;
  *
  * <p>Poses are written for RED in the Pedro field frame (inches, degrees, origin at the red/audience corner); BLUE runs
  * the same poses rotated 180 degrees about the field centre (the field is rotationally symmetric, not mirrored). A
- * shooting heading is chosen so the CELL sits in the turret's rest direction (RED: the robot's left, BLUE: its right),
- * and the turret holds that direction until the Limelight sees our upward CELL: the tags are in view as the robot
- * arrives, and the turret never chases a CELL behind the robot across its +-180 deg limit (on the 2 TIP route that
- * unwinding left it swinging +-20 deg when the shots went).
+ * shooting heading is chosen so the CELL sits in the turret's rest direction (the robot's right, 270, for both
+ * alliances since 2026-11-14: AllianceColor), and the turret holds that direction until the Limelight sees our upward
+ * CELL: the tags are in view as the robot arrives, and the turret never chases a CELL behind the robot across its
+ * +-180 deg limit (on the 2 TIP route that unwinding left it swinging +-20 deg when the shots went).
  *
  * <p>The gate is the flapper ({@link Intake#setFlapper}): down (shut) the intake collects into the hopper, up (open)
  * the intake feeds the hopper into the flywheel.
@@ -45,7 +45,7 @@ public abstract class BaseHiveAuto {
   /** Field interior (in): BLUE poses are RED's rotated about (FIELD_IN / 2, FIELD_IN / 2). */
   public static double FIELD_IN = 141.05;
 
-  /** Flywheel target while driving (ticks/s), until the Limelight gives the formula's (~1220-1230 at the shooting spots). */
+  /** Flywheel target while driving (ticks/s), until the Limelight gives the formula's (~1140-1160 at the shooting spots). */
   public static double SPINUP_TICKS = 1160;
   /**
    * Ready to shoot: turret within this of its aim (deg) and the flywheel within this of its target, held
@@ -99,6 +99,8 @@ public abstract class BaseHiveAuto {
       robot.clearBulkCache();
       telemetry.addData("AUTO", description);
       telemetry.addData("start", robot.follower.pose());
+      telemetry.addLine("Turret must point " + robot.getAllianceColor().turretRestName()
+          + " when INIT is pressed: the encoder zeroes there");
       telemetry.update();
     }
     return opMode.opModeIsActive();
@@ -126,7 +128,7 @@ public abstract class BaseHiveAuto {
     return p.withHeading(shootingHeading(p, cell));
   }
 
-  /** Heading (rad) that puts the CELL in the turret's rest direction from (x, y): RED left (90), BLUE right (270). */
+  /** Heading (rad) that puts the CELL in the turret's rest direction from (x, y): the robot's right (270). */
   protected double shootingHeading(Pose from, Pose cell) {
     double bearing = Math.atan2(cell.y() - from.y(), cell.x() - from.x());
     // turret position 180 = shooter forward, 90 = left, 270 = right: the rest direction is (180 - steadyState) CCW
