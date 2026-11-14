@@ -75,8 +75,8 @@ public class BaseTwoTip extends BaseHiveAuto {
    * of the plate, where the intake reaches 1.7 in into the bottom retrieval opening. x in, y in, heading deg. x 50.5 =
    * 3 in to the robot's right of the column line (was 47.5; on the robot it did not pick the stack up properly).
    */
-  public static double[] FLOWER_APPROACH_RED = {44.5, 117.0, 90};
-  public static double[] FLOWER_RED = {44.5, 127.2, 90};
+  public static double[] FLOWER_APPROACH_RED = {42.5, 114.0, 90};
+  public static double[] FLOWER_RED = {42.5, 126, 90};
   /** Intake running at the flower: 4 POLLEN, one per feed interval as the stack drops (ms). */
   public static int RETRIEVE_MS = 1000;
 
