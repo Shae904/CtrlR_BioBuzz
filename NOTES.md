@@ -5,7 +5,7 @@ did most of the code since the Pedro 3 upgrade. Treat it as a coworker's notes: 
 not rules. Keep it current: when you change something it describes, change it here too, and add a line to the log at
 the bottom.
 
-Kept current through PR #36 (2026-11-12) unless a section says otherwise.
+Kept current through PR #37 (2026-11-14) unless a section says otherwise.
 
 ---
 
@@ -46,7 +46,7 @@ inches, origin at the red/audience corner, x toward blue, y toward the rear wall
 **Turret** `ghettoturret:1`
 - Axis at robot (−13.8, −46.25) mm, i.e. 13.8 behind and 46.25 right of centre; turret plane 247.9 mm above the floor.
 - Motor: Yellow Jacket 435 RPM, 2.5:1 spur (40 T) → `Outtake.ticksPerDeg = 2.6701388889` (384.5 × 2.5 / 360). Motor `turret` REVERSE.
-- Code convention: turret position = encoder degrees + `AllianceColor.getSteadyState()` (RED 90, BLUE 270). **180 = shooter forward, 90 = shooter pointing left, 270 = right.** So at INIT the shooter must point **left on RED, right on BLUE**; the encoder zeroes there (every opmode). The geometric aim uses this angle + the robot heading for the camera's field heading: a turret off its rest at INIT by 5° costs ~6–14 mm of aim, more if worse.
+- Code convention: turret position = encoder degrees + `AllianceColor.getSteadyState()` (**both 270 since 2026-11-14**; RED was 90). **180 = shooter forward, 90 = shooter pointing left, 270 = right.** So at INIT the shooter must point **right, both alliances**; the encoder zeroes there (every opmode). The geometric aim uses this angle + the robot heading for the camera's field heading: a turret off its rest at INIT by 5° costs ~6–14 mm of aim, more if worse.
 - Rotating inertia ≈ 0.03 kg·m² (sim estimate). The aim (PR #20, `Subsystems/AimGeometry`): the turret turn that puts the shot line through the CELL opening, from the measured tags (see §4 "Aim"); then (PR #21, `Subsystems/TurretTracker`) the target is held as a **field direction**: a new frame is applied to the turret angle and robot heading **at its capture time** (Limelight capture + targeting latency), only new frames count, and every loop the target follows the robot's heading (+ `AIM_Kv` × turn-rate feed-forward). Tags lost: hold that direction 500 ms (`LOST_HOLD_MS`), then the teleop points at the target cell's opening from odometry (`OPENING_RED_*_IN`, BLUE rotated) until the tags are back, for at most 1.5 s per RB press (`ODOMETRY_PREAIM_TIMEOUT_MS`; then rest, "REST-SEARCH": re-press RB to retry, so a bad odometry heading can't keep the camera pointed away); the autos keep their own pre-aim (`setTarget`). `updateAim` runs every loop (aiming or not), so the delay history is always there and the aim is ready when RB goes down. Limits `TurretTracker.TURRET_MIN/MAX_DEG` 0..360 (seam straight back) with `SEAM_HYSTERESIS_DEG` 15: up to 15° past the seam the turret waits at its limit instead of swinging round. Only tags with a **3D pose** count (the height decides up vs down cell; telemetry warns "Full 3D" if tags come without). Frames asking > 40° (`MAX_FRAME_TURN_DEG`) or results > 300 ms old (`STALE_MS`) are ignored. Known small error: the capture time is taken from the SDK's receipt of the result, which polls every 10 ms, so the delay compensation can be up to 10 ms short. Flywheel default before any tag reading: `DEFAULT_SHOT_TICKS` 1150. PID `Limelight.AIM_Kp/Kd/Ks` are still DECODE's: tune with Panels' Graph of "Turret error" (teleop telemetry). Closed-loop model (approximate turret: ~1040°/s, 60 ms response): old logic overshot 14.5°, hunted ±5.2° standing still, lagged 13° with the robot turning 90°/s; new: 1.1°, ±0.1°, 2.5°.
 
 **Shooter** (flywheel + hood)
@@ -132,7 +132,7 @@ Field-centric drive on gamepad1 left stick, turn right stick (either pad). Left 
 - Logger Pro angle: the camera must be perpendicular to the shot plane or the angle reads steep.
 - The Pinpoint's IMU calibrates for ~0.25–0.5 s after INIT/reset: keep the robot still.
 - Pedro's pose starts at (0, 0) in every opmode: anything that needs the field position in the teleop needs `PoseStorage` (or a known start spot).
-- The turret encoder zeroes at every INIT wherever the turret is: it must point **left (RED) / right (BLUE)** then (teleop INIT telemetry reminds). Off by X there, the rest direction, the back seam and the aim's camera heading are all off by X.
+- The turret encoder zeroes at every INIT wherever the turret is: it must point **right (both alliances, since 2026-11-14)** then (the teleop and auto INIT telemetry remind). Off by X there, the rest direction, the back seam and the aim's camera heading are all off by X.
 - HIVE 4 (comp 1 values): at the shooting spot (12, 20) the robot's back-right corner reaches the red wall (x ≈ −0.04 in) at its −52.8° shooting heading, and the straight park line (12, 20) → (14, 106) passed the red-wall flower (plate x 0–4.9, y 44.2–50.1) with 0.05 in to spare: now a Bézier through (34, 64) (PR #23). The shooting spot itself is unchanged.
 - `Outtake.medSpeed/farSpeed` (1380 / 1560, manual presets with auto speed off) are the old model's; the current formula gives ~1146 at 2 m, ~1311 at 3.2 m.
 - An annotation check like `getClass().isAnnotationPresent(Autonomous.class)` inside a subsystem tests the subsystem's own class, never the opmode's: it is always false.
@@ -165,20 +165,29 @@ Vihaan (CommanderSleepy) now works with his own Claude session ("Vihaan's Claude
   - Every volley is `shootVolley()`: all 4 preloads go at spot A (§6's "shoot 3, keep the 4th" is old).
   - The flower arm is no longer lowered for the garden sweep, only for the rear flower.
   - Garden at heading 180: turn (28, 18), wall (25, 12), end (11.3, 12).
-  - Rear flower: approach (44.5, 117, 90°) → pickup (44.5, 127.2, 90°).
+  - Rear flower: approach (42.5, 114, 90°) → pickup (42.5, 126, 90°) (b9cb718, 11-13 22:14; it was 44.5 / 117 / 127.2 when this section was first written).
   - The Javadoc above these constants in `BaseTwoTip.java` still describes the older positions.
 - `SHOOTER TESTING` (89234e9): the intake is no longer held back by `feedAllowed()`, so `PACED_FEED` does nothing there. The left trigger reverses the intake.
 - `MOTOR TESTING` is now named **`SERVO&MOTOR TESTING`** (2026-11-13), with a `FLOWER_TWO_POS` field for `flower2`.
 
+**PR #37 (2026-11-14, Ryan's Claude, comp eve)**
+- **Turret rest is the robot's right (270) for both alliances**: `AllianceColor.RED.getSteadyState()` 90 → 270. The left side (the battery side) shot less consistently in testing. **At INIT the turret must point RIGHT on both alliances** (teleop and auto INIT telemetry say so, from `AllianceColor.turretRestName()`). RED autos now shoot with the cell on the turret's right, so RED's routes are BLUE's rotated 180° exactly (same headings relative to the field). Robot outline swept along every RED path: all clear except as noted below; the 2 TIP turn away from the rear flower, which clipped the flower plate by ~1 in with the turret on the left, now clears it by 0.3 in.
+- HIVE 4 `SHOOT_RED` (12, 20) → **(13.2, 20)** (both alliances): with the turret on the right the robot's front-left corner was 0.64 in into the red wall at (12, 20) (BLUE's already was, at its mirrored spot); now 0.5 in off it. 1.44 m from the opening (was 1.46).
+- 2 TIP: removed the 250 ms wait at the garden (it waited for the flower arm, which no longer lowers there) and the no-op arm raise after the sweep. Stale Javadoc/comments updated (2 TIP routine and positions, `SHOT_ETA`, flapper, `SPINUP_TICKS`).
+- **New autos `CLOSE RED 4` / `CLOSE BLUE 4`** (`Auton/Close4`): start in the corner beside our LOADING ZONE (RED (7.36, 132.68, 0°): back on the red wall, left side on the rear wall; BLUE rotated: (133.69, 8.37, 180°)), drive to 2 TIP's scoring-cell spot (15.5, 125.9) with the cell on the turret's right, wait until the Limelight sees our cell on this side **up** (RED SCORING 30–33 / BLUE AUDIENCE 38–41: down at the start, up after a partner's tip; a down cell never counts), up to `SEE_DEADLINE_S` 27 s after START, then `aimUntilReady` + `shootVolley` (4) and park at (17, 106, 90°) in the LOADING ZONE. Not seen by 27 s: park without shooting. A cell first seen after ~25 s still gets the volley, and the park then ends after AUTO.
+- Not changed on purpose (comp tomorrow): turret aim derivative clip, `FLYWHEEL_TOLERANCE`, `Limelight.DEFAULT_SHOT_TICKS` (still 1220; the formula gives ~1140–1180 with `SHOT_ETA` 1.01), `flower2` required in the configuration.
+
 **Open issues (2026-11-13, not fixed yet)**
 - **Turret lock-on is slow.** `updateAimPID` clips the error derivative to ±50°/s (kept from the DECODE code), while the turret turns ~1000°/s, so the D term is almost always clipped and never exceeds 50 × Kd = 0.025 power. With practically no damping, Kp has to stay low to avoid overshoot. Proposed fix: take D from the turret encoder's measured velocity, without the clip, then retune Kd and raise Kp.
-- Auto "ready" check: `FLYWHEEL_TOLERANCE 30` trips easily, since the hub reports speed in steps of 20 and the formula's target moves in steps of 20. 40 is worth trying. `READY_HOLD_MS` (80) and `AIM_TOLERANCE_DEG` (2.0) could also loosen; the opening leaves ~±5° from the auto spots.
+- Auto "ready" check: `FLYWHEEL_TOLERANCE 30` trips easily, since the hub reports speed in steps of 20 and the formula's target moves in steps of 20. (Correction, Ryan's Claude 11-14: speed readings and targets are both multiples of 20 and `atTarget` is a strict `<`, so 30 and 40 both accept only 0 or ±20; to also accept ±40 it takes 50 or more.) `READY_HOLD_MS` (80) and `AIM_TOLERANCE_DEG` (2.0) could also loosen; the opening leaves ~±5° from the auto spots.
 - 2 TIP skips a scoring-cell volley entirely if `aimUntilReady` times out without tags in view (`|| hasValidTarget()`), so those balls stay in the hopper.
 - BLUE SCORING: shots went to the left of the cell on 11-13 after working well on 11-12. Not investigated yet.
 
 ---
 
 ## Log (newest first; add a line when you change the robot)
+
+- 2026-11-14: PR #37 turret rest = the robot's right for both alliances (RED 90 → 270; point it RIGHT at INIT), RED autos mirror BLUE's; HIVE 4 spot x 12 → 13.2 (off the red wall); 2 TIP dead garden wait removed; new `CLOSE RED 4` / `CLOSE BLUE 4`; stale comments fixed. (Ryan's Claude/Ryan)
 
 - 2026-11-13: flower servo positions finalized: `flower2` `FLOWER_TWO_UP` 0.29 / `FLOWER_TWO_DOWN` 0.58 (were −0.01 placeholders); `flower` stays 0.3 / 0.74. (Vihaan / Vihaan's Claude)
 - 2026-11-13: autos: `SPINUP_TICKS` 1220 → 1160, `AIM_TIMEOUT_MS` 3000 → 2000, `GATE_OPEN_MS` 200 → 0, `SHOOT_ALL_MS` 1600 → 2600. 2 TIP: garden at heading 180 (y 12, end x 11.3), rear flower at x 44.5 (pickup y 127.2). `FLAPPER_DOWN` 0.78, `FLOWER_UP` 0.3, `FLOWER_DOWN` 0.74, second flower servo `flower2` (placeholder positions), `MOTOR TESTING` renamed `SERVO&MOTOR TESTING`. NOTES §11 added. (Vihaan / Vihaan's Claude)

@@ -75,10 +75,9 @@ public class Limelight {
    * Shooter efficiency: the fraction of that rolling speed the ball really leaves with. It scales the whole curve
    * (every distance by the same ratio), so it is THE number to calibrate on the robot: shots long -> raise it, short ->
    * lower it; from one spot, new = old x (speed the formula asked for) / (speed that lands).
-   * 0.947 is this shooter's efficiency as last measured: the 2026-10-19 test (1140 ticks/s scored from 1.54 m) taken
-   * at the ~58 deg the old hood launched at (Logger Pro, 2026-10-21); that test's 1140 is NOT a target any more (it
-   * was the old angle). At 52.6 deg this gives 1.4 m -> 1250, 1.54 m -> 1220, 2.0 m -> 1225, 2.5 m -> 1290,
-   * 3.0 m -> 1370. Not yet confirmed with the new hood: 1.00 (no loss at all) would be 1155 at 1.54 m.
+   * 1.01 was tuned on the robot with the new hood (CommanderSleepy, 2026-11-12; it was 0.947 from the old hood's
+   * test): camera -> opening 1.40 m -> 1171, 1.45 m -> 1159, 1.50 m -> 1149, 1.55 m -> 1143 ticks/s (before the
+   * rounding to steps of 20).
    */
   public static double SHOT_ETA = 1.01;
   public static double SHOT_MOVE_GAIN = 93 * Math.cos(Math.toRadians(50)); // ticks per m/s toward the goal (DECODE tuning)

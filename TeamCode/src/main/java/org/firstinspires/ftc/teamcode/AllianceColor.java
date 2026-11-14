@@ -10,11 +10,8 @@ public enum AllianceColor {
 
     @Override
     public double getSteadyState() {
-      return 90.0;
+      return 270.0;   // the robot's right, like BLUE (was 90, the left: the battery side shot less consistently)
     }
-
-
-    ;
   },
   BLUE {
 
@@ -36,5 +33,17 @@ public enum AllianceColor {
    */
   public abstract int getLLPipelineTeleOP();
 
+  /**
+   * The turret's rest direction and INIT position (turret position: 180 = shooting forward, 90 = left, 270 = right).
+   * The turret encoder zeroes at every INIT, so the turret must be pointing this way when INIT is pressed. Both
+   * alliances use the robot's right (270) since 2026-11-14; RED used the left (90) before, which put its shots on the
+   * battery side.
+   */
   public abstract double getSteadyState();
+
+  /** The rest direction in words, for the INIT reminder. */
+  public String turretRestName() {
+    double s = getSteadyState();
+    return s == 90 ? "LEFT" : s == 270 ? "RIGHT" : s == 180 ? "FORWARD" : (s + " deg");
+  }
 }

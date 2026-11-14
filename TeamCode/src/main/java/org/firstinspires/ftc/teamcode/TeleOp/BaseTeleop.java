@@ -7,7 +7,6 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.util.ElapsedTime;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
-import org.firstinspires.ftc.teamcode.AllianceColor;
 import org.firstinspires.ftc.teamcode.PoseStorage;
 import org.firstinspires.ftc.teamcode.Robot;
 import org.firstinspires.ftc.teamcode.Subsystems.HiveTargeting;
@@ -73,8 +72,8 @@ public class BaseTeleop {
       this.opMode.gamepad1.leftBumperWasPressed();
       this.opMode.gamepad2.leftBumperWasPressed();
       telemetry.addData("ALLIANCE COLOR", robot.getAllianceColor());
-      telemetry.addLine("Turret must point " + (robot.getAllianceColor() == AllianceColor.RED
-          ? "LEFT" : "RIGHT") + " (its rest) when INIT is pressed: the encoder zeroes there");
+      telemetry.addLine("Turret must point " + robot.getAllianceColor().turretRestName()
+          + " (its rest) when INIT is pressed: the encoder zeroes there");
       addTargetTelemetry();
       telemetry.update();
     }

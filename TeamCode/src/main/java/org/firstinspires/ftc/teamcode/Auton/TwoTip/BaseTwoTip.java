@@ -14,9 +14,9 @@ import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
  *
  * <ol>
  *   <li>Out from the audience wall, line up in front of the audience CELL (up at the start, holding its 3 NECTAR) and
- *       shoot 3 preloads: the third POLLEN tips the HIVE. The fourth preload stays in the hopper.</li>
- *   <li>Sweep the GARDEN line along the audience wall with the flower arm down, the intake running and the gate shut:
- *       3 more POLLEN fill the hopper.</li>
+ *       shoot all 4 preloads in one volley: the third POLLEN tips the HIVE.</li>
+ *   <li>Sweep the GARDEN line parallel to the audience wall with the intake running and the gate shut (the flower arm
+ *       stays up): POLLEN fill the hopper.</li>
  *   <li>Behind the HIVE: the tip turned the scoring CELL up, opening to the rear. Shoot the 4.</li>
  *   <li>The rear flower, flower arm down: its 4 POLLEN through the bottom retrieval opening.</li>
  *   <li>Back to the same spot, shoot the 4: 8 POLLEN tip the HIVE again.</li>
@@ -37,16 +37,9 @@ public class BaseTwoTip extends BaseHiveAuto {
   public static double[] CELL_A_RED = {57.8, 54.8};
 
   /**
-   * RED GARDEN sweep, x in, y in, heading deg (the robot's left side, its wheels, is 8.37 in from its centre):
-   * <ul>
-   *   <li>GARDEN_TURN: the whole turn to 180 happens here, 9.6 in clear of the audience wall, as its own path (it was
-   *       folded into the slide to the wall, so the robot could reach the wall still turning, at an angle).</li>
-   *   <li>GARDEN_WALL: slide straight down beside the wall, 0.2 in off it, so Pedro can reach the end (at 0.03 in, any
-   *       odometry error hit the wall first and the drive waited out its timeout pushing on it).</li>
-   *   <li>GARDEN_END: sweep toward the red wall, closing the last 0.2 in and riding the wall with a light 0.27 in press
-   *       (it was 1.37 in into the wall, so the follower strafed the left wheels into it for the whole sweep and kept
-   *       pushing after). It ends with the front against the corner POLLEN.</li>
-   * </ul>
+   * RED GARDEN sweep, x in, y in, heading deg (tuned on the robot, 2026-11-13): the whole turn to 180 happens at
+   * GARDEN_TURN as its own path, then a slide down to GARDEN_WALL and a slow sweep toward the red wall at y 12 (the
+   * robot's left side, 8.37 in from its centre, stays ~3.6 in off the audience wall).
    */
   public static double[] GARDEN_TURN_RED = {28.0, 18.0, 180};
   public static double[] GARDEN_WALL_RED = {25.0, 12, 180};
@@ -55,7 +48,7 @@ public class BaseTwoTip extends BaseHiveAuto {
   public static int SWEEP_TIMEOUT_MS = 1500;
   /** Path speed limit while sweeping the GARDEN and closing in on the flower (in/s). */
   public static double SLOW_SPEED = 25;
-  /** The flower arm's travel down before a pickup starts (ms). */
+  /** The flower arm's travel down before the rear-flower pickup starts (ms). */
   public static int FLOWER_ARM_MS = 250;
 
   /** RED curve from the GARDEN to SHOOT_B (control points, x in, y in): clear of the red-wall flower and the HIVE. */
@@ -63,17 +56,17 @@ public class BaseTwoTip extends BaseHiveAuto {
   public static double[] VIA_2_RED = {26.0, 95.0};
   /**
    * RED spot for the scoring CELL, x in, y in: 1.47 m from its opening, 47 deg off its axis (closer than ~1.4 m the
-   * formula's speed climbs and POLLEN bounce back out of the CELL), with the robot's corners 1.8 in off the red wall
-   * and 2.2 in off the rear wall (BLUE's robot faces the other way: the CELL is on its turret's right).
+   * formula's speed climbs and POLLEN bounce back out of the CELL). With the CELL on the turret's right the robot's
+   * corners are 4.4 in off the red wall and 2.2 in off the rear wall.
    */
   public static double[] SHOOT_B_RED = {15.5, 125.9};
   /** RED scoring CELL opening, x in, y in (up after the first tip, facing the rear). */
   public static double[] CELL_B_RED = {57.8, 86.25};
 
   /**
-   * RED rear flower (column x 47.13, plate face 4.89 in off the rear wall): in front of it, then the front 0.1 in short
-   * of the plate, where the intake reaches 1.7 in into the bottom retrieval opening. x in, y in, heading deg. x 50.5 =
-   * 3 in to the robot's right of the column line (was 47.5; on the robot it did not pick the stack up properly).
+   * RED rear flower (column x 47.13, plate face 136.16 in): in front of it, then the pickup with the front ~0.3 in short
+   * of the plate. x in, y in, heading deg (tuned on the robot, 2026-11-13). At x 42.5 the intake roller spans x
+   * 36.1-48.2, covering the bottom retrieval opening (x 45.4-48.9) up to its last 0.7 in.
    */
   public static double[] FLOWER_APPROACH_RED = {42.5, 114.0, 90};
   public static double[] FLOWER_RED = {42.5, 126, 90};
@@ -92,7 +85,7 @@ public class BaseTwoTip extends BaseHiveAuto {
 
   @Override
   public void run() {
-    if (!initAndWaitForStart("2 TIP: 3 preloads, garden + rear flower into the scoring CELL")) {
+    if (!initAndWaitForStart("2 TIP: 4 preloads, garden + rear flower into the scoring CELL")) {
       return;
     }
     Pose cellA = fieldPose(CELL_A_RED);
@@ -107,7 +100,7 @@ public class BaseTwoTip extends BaseHiveAuto {
     Pose flowerApproach = fieldPose(FLOWER_APPROACH_RED);
     Pose flower = fieldPose(FLOWER_RED);
 
-    // --- 1. out, line up at the audience CELL, shoot 3: the third tips the HIVE ---
+    // --- 1. out, line up at the audience CELL, shoot all 4: the third tips the HIVE ---
     phase = "DRIVE A";
     robot.outtake.setTargetVelocity(SPINUP_TICKS);
     driveTo(Paths.path(Paths.line(start, out).constant(start.heading()), Paths.line(out, shootA).linear(out, shootA)),
@@ -117,19 +110,17 @@ public class BaseTwoTip extends BaseHiveAuto {
     phase = "SHOOT 4";
     shootVolley();
 
-    // --- 2. the GARDEN: 3 POLLEN fill the hopper (flower arm down) ---
+    // --- 2. the GARDEN: POLLEN fill the hopper (the flower arm stays up) ---
     phase = "GARDEN";
     driveTo(Paths.line(shootA, gardenTurn).linear(shootA, gardenTurn), DRIVE_TIMEOUT_MS);
     drive(Paths.line(gardenTurn, gardenWall).constant(gardenTurn.heading()), WALL_TIMEOUT_MS);
     intake(true);
-    waitMs(FLOWER_ARM_MS);
     Pose atWall = robot.follower.pose();
     drive(Paths.line(atWall, gardenEnd).constant(gardenEnd.heading()).with(slow()), SWEEP_TIMEOUT_MS);
-    flowerArm(false);
 
     // --- 3. behind the HIVE: shoot 4 into the scoring CELL ---
     phase = "DRIVE B";
-    Pose atGarden = robot.follower.pose();   // pressed on the wall, not exactly at GARDEN_END
+    Pose atGarden = robot.follower.pose();   // where the sweep really ended, not exactly GARDEN_END
     driveTo(Paths.curve(atGarden, fieldPose(VIA_1_RED), fieldPose(VIA_2_RED), shootB).linear(atGarden, shootB),
         DRIVE_TIMEOUT_MS);
     intake(false);

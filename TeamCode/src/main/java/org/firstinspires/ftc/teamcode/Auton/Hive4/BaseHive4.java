@@ -19,8 +19,12 @@ public class BaseHive4 extends BaseHiveAuto {
 
   /** RED: straight out from the audience wall first (clear of the wall before turning), x in, y in. */
   public static double[] OUT_RED = {46.0, 22.0};
-  /** RED shooting spot, x in, y in: ~1.43 m from the CELL opening, 47 deg off its axis, clear of the garden pollen. */
-  public static double[] SHOOT_RED = {12, 20};
+  /**
+   * RED shooting spot, x in, y in: 1.44 m from the CELL opening, clear of the garden pollen. 13.2 (was 12, comp 1):
+   * with the turret on the robot's right (both alliances since 2026-11-14) the robot's front-left corner is 0.5 in off
+   * the red wall here; at 12 it was 0.64 in into it (BLUE's has been, at its mirrored spot).
+   */
+  public static double[] SHOOT_RED = {13.2, 20};
   /** RED upward CELL opening (the audience CELL at the start), x in, y in. */
   public static double[] CELL_RED = {57.8, 54.8};
 
