@@ -5,7 +5,7 @@ did most of the code since the Pedro 3 upgrade. Treat it as a coworker's notes: 
 not rules. Keep it current: when you change something it describes, change it here too, and add a line to the log at
 the bottom.
 
-Kept current through PR #40 (2026-11-15) unless a section says otherwise.
+Kept current through PR #41 (2026-11-15) unless a section says otherwise.
 
 ---
 
@@ -62,10 +62,10 @@ inches, origin at the red/audience corner, x toward blue, y toward the rear wall
 **Intake / hopper**
 - Front roller of 9 compliant wheels (Ø48), axis 217 mm ahead of centre, 90 mm above the floor, 306 mm wide. Only POLLEN (2.8 in) fits the 80 mm channel; NECTAR (3.6 in) does not. Hopper holds 4 (the preload count). Motor `intake` REVERSE, `POWER_INTAKE = 1`.
 - Gate ("slapper", added to the robot 2026-10-22): servo `flapper`, driven by `Intake.setFlapper(boolean up)`. **Starts DOWN** (shut: the hopper holds balls while intaking) at construction and at INIT; **UP** (open: balls feed into the flywheel) only while triangle is held in teleop, or while an auto shoots. Positions: `Intake.FLAPPER_UP 0.17` / `FLAPPER_DOWN 0.04` (CommanderSleepy, retuned 2026-10-23; first measured 0.27 / 0.1). The autos open it only for a volley (`shoot(n)` / `shootVolley()`), down while driving and intaking; the timing constants `GATE_OPEN_MS 200` (servo travel before the intake starts) and `FEED_FIRST_MS 150` / `FEED_MARGIN_MS 110` (one intake pulse = one ball) are still sim guesses to check on the robot. The DECODE `cycler` servo and its cycle state machine are gone (PR #16); `Intake` is just the roller motor + the flapper.
-- `flower` servo (CommanderSleepy, 2026-11-09): down 0.87, up **0.4** (`FLOWER_UP`, was 0.7), 0.4 at construction (`FLOWER_START`). Teleop (PR #29): **gp1 dpad down toggles** it, gp2 cross holds it down. Must exist in the robot configuration (Intake gets it at INIT).
+- `flower` servo (CommanderSleepy, 2026-11-09): down 0.87, up **0.4** (`FLOWER_UP`, was 0.7), 0.4 at construction (`FLOWER_START`). Teleop (PR #29): **gp1 dpad down toggles** it, gp2 cross holds it down. Must exist in the robot configuration (Intake gets it at INIT). **Since PR #41 (2026-11-15) the flower servos (`flower`, `flower2`) are not moved at construction / INIT**: they stay unpowered until START, where every auto raises the arm (`setFlower(false)` at the start of its run) and the teleop sets it every loop. Current positions: `FLOWER_UP 0.16 / FLOWER_DOWN 0.74`, `FLOWER_TWO_UP 0.22 / FLOWER_TWO_DOWN 0.58`. `Intake.FLOWER_INIT` / `FLOWER_TWO_INIT` (both 0) and `setFlowerStart()` exist, but nothing calls them.
 - Other servos: `tiltA`/`tiltB` (folded .98/.08, deployed .49/.55), `rgb` (indicator: .5 locked on, .277 not aimed, .611 no target).
 
-**Hardware map names** (all of them): `fl fr bl br flywheel1 flywheel2 turret intake` (motors), `flapper flower tiltA tiltB rgb` (servos), `imu`, `limelight`, `pinpoint`.
+**Hardware map names** (all of them): `fl fr bl br flywheel1 flywheel2 turret intake` (motors), `flapper flower flower2 tiltA tiltB rgb` (servos), `imu`, `limelight`, `pinpoint`.
 
 ## 3. The field (what the code and autos assume)
 
@@ -204,6 +204,8 @@ Vihaan (CommanderSleepy) now works with his own Claude session ("Vihaan's Claude
 ---
 
 ## Log (newest first; add a line when you change the robot)
+
+- 2026-11-15: PR #41 flower servos no longer moved at INIT (`setFlowerStart()` out of the Intake constructor, new `FLOWER_INIT` / `FLOWER_TWO_INIT` 0, unused); every auto raises the arm at START instead (HIVE 4, CLOSE 4, 2 TIP; Ryan's Claude added the same line to 2 TIP OLD). Local edits from Ryan's computer, committed as they were. (Ryan / Ryan's Claude)
 
 - 2026-11-15: PR #40 teleop turret: gp2 right stick steers it until the tags are seen, then the Limelight locks while the stick is held (gp2 rumbles); no return to rest in the teleop; stick stops short of the cable limits; teleop keeps the auto's turret zero (gp2 square re-zeroes in INIT); gp2 right stick no longer turns the robot. Autos unchanged. (Ryan's Claude/Ryan)
 

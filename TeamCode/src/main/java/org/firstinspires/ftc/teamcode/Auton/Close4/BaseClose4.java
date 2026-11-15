@@ -58,6 +58,7 @@ public class BaseClose4 extends BaseHiveAuto {
 
     // --- 1. to the shooting spot, flywheel spinning ---
     phase = "DRIVE";
+    robot.intake.setFlower(false);
     robot.outtake.setTargetVelocity(SPINUP_TICKS);
     driveTo(Paths.path(Paths.line(start, out).constant(start.heading()), Paths.line(out, shoot).linear(out, shoot)),
         DRIVE_TIMEOUT_MS);
