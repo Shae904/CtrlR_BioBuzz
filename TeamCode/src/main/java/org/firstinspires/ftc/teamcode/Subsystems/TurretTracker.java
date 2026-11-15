@@ -115,6 +115,11 @@ public class TurretTracker {
     return hasFix && nowNs - fixNs <= LOST_HOLD_MS * 1_000_000L;
   }
 
+  /** ms since the last vision fix, infinity when there is none (TurretSteer: its own, longer hold). */
+  public double fixAgeMs(long nowNs) {
+    return hasFix ? (nowNs - fixNs) / 1e6 : Double.POSITIVE_INFINITY;
+  }
+
   /** The turret position that points at the last fix's field direction, for the robot's heading now. */
   public double targetFromField(double robotHeadingDeg) {
     return 180 + robotHeadingDeg - fieldDeg;

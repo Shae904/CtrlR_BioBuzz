@@ -142,9 +142,22 @@ public class Robot {
   }
 
   /**
-   * Turret: aims at the target CELL while {@code shouldAim} (Limelight: field-held aim, see TurretTracker), else back to
-   * its rest direction. (The DECODE "reset" that faked the turret at 180 deg, gamepad1 square, spun it at full power
-   * while held: removed.)
+   * TELEOP turret (Subsystems.TurretSteer): gamepad2's right stick steers it until the target CELL's tags are seen,
+   * then the Limelight holds them while the stick stays off its centre; {@code rbAim} aims on its own; with neither
+   * the turret stays where it is.
+   */
+  public void updateAimingSystem(boolean rbAim, double stickX, boolean stickActive) {
+    double turretPosition = this.outtake.getTurretPosDegrees();
+    // Every loop, aiming or not: the turret/heading history for the camera delay, and a held aim ready at once
+    this.limelight.updateAim(this.follower.pose(), this.follower.twist(), turretPosition);
+    this.limelight.updateTargetTeleop(turretPosition, rbAim, stickX, stickActive, this.getAllianceColor());
+    this.outtake.setPowerTurret(this.limelight.updateAimPID());
+  }
+
+  /**
+   * Turret, the autos' way: aims at the target CELL while {@code shouldAim} (Limelight: field-held aim, see
+   * TurretTracker), else back to its rest direction. (The DECODE "reset" that faked the turret at 180 deg, gamepad1
+   * square, spun it at full power while held: removed.)
    */
   public void updateAimingSystem(boolean shouldAim) {
     double turretPosition = this.outtake.getTurretPosDegrees();

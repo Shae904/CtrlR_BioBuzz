@@ -104,6 +104,14 @@ public class Outtake {
   private boolean ramping;
   /** False in @Autonomous opmodes: the autos keep the full-power spin-up and get no recovery experiment. */
   private final boolean notAutonomous;
+  /**
+   * The turret encoder has been zeroed, by an AUTO's INIT or by the TELEOP, since the Robot Controller app started (a
+   * static outlives the opmodes, and the hub keeps counting between them: the SDK does not reset encoders when an
+   * opmode starts).
+   */
+  private static boolean turretZeroed;
+  /** This opmode zeroed the turret itself (at its INIT, or zeroTurretHere); false = it kept an earlier opmode's zero. */
+  private boolean turretZeroedThisOpMode;
 
   // shot-recovery experiments
   private boolean feeding;                             // the gate is open (teleop) / the intake is feeding (test opmode)
@@ -135,14 +143,21 @@ public class Outtake {
     flywheel1.setZeroPowerBehavior(ZeroPowerBehavior.FLOAT);
     flywheel1.setMode(RunMode.RUN_WITHOUT_ENCODER);
 
+    // the opmode's own class (RedHive4, RedTeleop, ...), so every @Autonomous opmode is excluded
+    notAutonomous = !opMode.getClass().isAnnotationPresent(Autonomous.class);
+
     turret = hardwareMap.get(DcMotorEx.class, "turret");
     turret.setDirection(Direction.REVERSE);
     turret.setZeroPowerBehavior(ZeroPowerBehavior.BRAKE);
-    turret.setMode(RunMode.STOP_AND_RESET_ENCODER);
-    turret.setMode(RunMode.RUN_WITHOUT_ENCODER);
-
-    // the opmode's own class (RedHive4, RedTeleop, ...), so every @Autonomous opmode is excluded
-    notAutonomous = !opMode.getClass().isAnnotationPresent(Autonomous.class);
+    // The autos zero the turret at every INIT, exactly as before: it is set pointing to the robot's right there (its
+    // rest, the only way the robot is in sizing). No other opmode zeroes it here, so the TELEOP knows the turret's
+    // angle wherever the last opmode left it (the TELEOP no longer returns it to the rest direction). The TELEOP
+    // zeroes at its own INIT only when nothing has since the app started (BaseTeleop); the test opmodes never do.
+    if (!notAutonomous) {
+      zeroTurretHere();
+    } else {
+      turret.setMode(RunMode.RUN_WITHOUT_ENCODER);
+    }
 
     battery = hardwareMap.voltageSensor.iterator().next();
     readBatteryVoltage();
@@ -343,6 +358,29 @@ public class Outtake {
 
   public double getTurretPosDegrees() {
     return turret.getCurrentPosition() / 2.6701388889;
+  }
+
+  /**
+   * Zeroes the turret encoder here: the turret must be pointing in its rest direction (the robot's right). For an INIT
+   * (the TELEOP's gamepad2 square), with the turret unpowered and the cable lying as it does at rest; not for a match,
+   * where nobody can see how the cable is wound.
+   */
+  public void zeroTurretHere() {
+    turret.setPower(0);
+    turret.setMode(RunMode.STOP_AND_RESET_ENCODER);
+    turret.setMode(RunMode.RUN_WITHOUT_ENCODER);
+    turretZeroed = true;
+    turretZeroedThisOpMode = true;
+  }
+
+  /** This opmode zeroed the turret itself; false = it kept the zero of an earlier opmode. */
+  public boolean turretZeroedThisOpMode() {
+    return turretZeroedThisOpMode;
+  }
+
+  /** An AUTO's INIT or a TELEOP has zeroed the turret since the Robot Controller app started. */
+  public static boolean turretZeroKnown() {
+    return turretZeroed;
   }
 
   public void stop() {

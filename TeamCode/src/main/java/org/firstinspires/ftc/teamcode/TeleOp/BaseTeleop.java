@@ -4,6 +4,7 @@ import com.bylazar.configurables.annotations.Configurable;
 import com.pedropathing.math.Pose;
 import com.qualcomm.hardware.lynx.LynxModule.BulkCachingMode;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
+import com.qualcomm.robotcore.hardware.Gamepad;
 import com.qualcomm.robotcore.util.ElapsedTime;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
@@ -12,6 +13,7 @@ import org.firstinspires.ftc.teamcode.Robot;
 import org.firstinspires.ftc.teamcode.Subsystems.HiveTargeting;
 import org.firstinspires.ftc.teamcode.Subsystems.Limelight;
 import org.firstinspires.ftc.teamcode.Subsystems.Outtake;
+import org.firstinspires.ftc.teamcode.Subsystems.TurretTracker;
 
 @Configurable
 public class BaseTeleop {
@@ -26,12 +28,21 @@ public class BaseTeleop {
   /** Field trims per gamepad2 dpad press (auto-speed mode): flywheel ticks/s (up/down) and turret aim deg (left/right). */
   public static double SPEED_TRIM_STEP = 10;
   public static double AIM_TRIM_STEP = 0.5;
+  /**
+   * gamepad2's right stick aims the turret (Subsystems.TurretSteer) while it is further than this from its centre, in
+   * any direction (on top of the SDK's own stick deadzone).
+   */
+  public static double TURRET_STICK_ACTIVE = 0.1;
 
   /** Which CELL the Limelight targets: gamepad2 circle (Xbox B) toggles AUDIENCE / SCORING; no auto switching. */
   private HiveTargeting.Cell cell;
   /** Flower toggled down by gamepad1 dpad down (gamepad2 cross also holds it down). */
   private boolean flowerDown;
   private String poseSource = "";
+  /** Aiming this loop: RB on either pad, or gamepad2's right stick off its centre. */
+  private boolean aiming;
+  /** gamepad2 is rumbling for a lock. */
+  private boolean lockRumble;
   private final ElapsedTime pipelineMismatch = new ElapsedTime();
 
   public BaseTeleop(LinearOpMode opMode, Robot robot, double headingOffset) {
@@ -57,12 +68,21 @@ public class BaseTeleop {
     robot.follower.setPose(start);
     cell = HiveTargeting.initialCell(start.y());   // the side the robot starts on; the drivers switch with square / circle
     robot.limelight.targetCell(cell);
+    // Turret: keep the zero of the AUTO (or of an earlier TELEOP), so it can be anywhere now; nothing has zeroed it
+    // since the app started: zero here, as every INIT used to
+    if (!Outtake.turretZeroKnown()) {
+      robot.outtake.zeroTurretHere();
+    }
 
     // --- INIT LOOP --- (the CELL buttons, the wall reset and the trims work here too)
     while (this.opMode.opModeInInit()) {
       this.robot.clearBulkCache();
       this.robot.follower.update();
       this.resetOdometryAtWall();
+      if (this.opMode.gamepad2.squareWasPressed()) {   // INIT only: the turret points to its rest, zero it here
+        robot.outtake.zeroTurretHere();
+        this.opMode.gamepad2.rumble(400);
+      }
       this.updateCellTarget();
       this.updateTrims();
       // drop presses of the match-only buttons made during INIT (they would fire at START)
@@ -72,8 +92,13 @@ public class BaseTeleop {
       this.opMode.gamepad1.leftBumperWasPressed();
       this.opMode.gamepad2.leftBumperWasPressed();
       telemetry.addData("ALLIANCE COLOR", robot.getAllianceColor());
-      telemetry.addLine("Turret must point " + robot.getAllianceColor().turretRestName()
-          + " (its rest) when INIT is pressed: the encoder zeroes there");
+      String rest = robot.getAllianceColor().turretRestName();
+      if (robot.outtake.turretZeroedThisOpMode()) {
+        telemetry.addLine("Turret zeroed here: it must be pointing " + rest + " now (gp2 square zeroes it again)");
+      } else {
+        telemetry.addLine("Turret zero kept from the last opmode. If the angle below is wrong, point it " + rest
+            + " and press gp2 square");
+      }
       addTargetTelemetry();
       telemetry.update();
     }
@@ -90,11 +115,18 @@ public class BaseTeleop {
       // DRIVETRAIN
       double x = this.opMode.gamepad1.left_stick_x;
       double y = -this.opMode.gamepad1.left_stick_y;
-      float rotStickAvg = this.opMode.gamepad1.right_stick_x + this.opMode.gamepad2.right_stick_x;
+      float rotStick = this.opMode.gamepad1.right_stick_x;   // gamepad1 only: gamepad2's right stick is the turret's
 
-      this.robot.updateAimingSystem(this.opMode.gamepad1.right_bumper || this.opMode.gamepad2.right_bumper);
+      // TURRET: gamepad2's right stick steers it until the tags are seen, then the Limelight holds them while the
+      // stick stays off its centre (any direction); RB (either pad) aims on its own; with neither it stays put
+      float turretStickX = this.opMode.gamepad2.right_stick_x;
+      boolean stickAim = Math.hypot(turretStickX, this.opMode.gamepad2.right_stick_y) > TURRET_STICK_ACTIVE;
+      boolean rbAim = this.opMode.gamepad1.right_bumper || this.opMode.gamepad2.right_bumper;
+      aiming = rbAim || stickAim;
+      this.robot.updateAimingSystem(rbAim, turretStickX, stickAim);
+      this.updateLockRumble();
 
-      this.fieldCentricDrive(x, y, rotStickAvg);
+      this.fieldCentricDrive(x, y, rotStick);
 
       // FLAPPER: up (feeding) only while triangle is held on either pad, down otherwise
       robot.intake.setFlapper(this.opMode.gamepad2.triangle || this.opMode.gamepad1.triangle);
@@ -107,11 +139,17 @@ public class BaseTeleop {
       }
       robot.intake.setFlower(flowerDown || this.opMode.gamepad2.cross);
 
+      // (rumble only when the mode changes: the right stick now aims the turret, and clicking it by accident must
+      // not feel like a lock)
       if (this.opMode.gamepad2.right_stick_button) {
-        this.opMode.gamepad2.rumble(500);
+        if (!autoCalculateShootPower) {
+          this.opMode.gamepad2.rumble(500);
+        }
         autoCalculateShootPower = true;
       } else if (this.opMode.gamepad2.left_stick_button) {
-        this.opMode.gamepad2.rumble(500);
+        if (autoCalculateShootPower) {
+          this.opMode.gamepad2.rumble(500);
+        }
         autoCalculateShootPower = false;
       }
 
@@ -119,7 +157,7 @@ public class BaseTeleop {
       if (this.opMode.gamepad1.dpad_up) {   // flywheel stop (was dpad down, now the flower toggle)
         robot.outtake.stop();
       } else if (autoCalculateShootPower) {
-        if (this.opMode.gamepad1.right_bumper || this.opMode.gamepad2.right_bumper) {
+        if (aiming) {
           robot.outtake.setTargetVelocity(robot.limelight.calculateTargetVelocity());
         } else {
           robot.outtake.setTargetVelocity(1000); // 400
@@ -153,6 +191,23 @@ public class BaseTeleop {
       // TELEMETRY
       updateTelemetry();
     }
+    this.opMode.gamepad2.stopRumble();
+  }
+
+  /**
+   * gamepad2 rumbles for as long as the Limelight is aiming the turret (tags in view, or just lost and their direction
+   * held), whoever asked (the stick or RB). Sent only when it changes; a short rumble from another button (a trim, the
+   * CELL toggle) replaces it, so it is sent again once that one has ended.
+   */
+  private void updateLockRumble() {
+    boolean locked = robot.limelight.isLocked();
+    Gamepad pad = this.opMode.gamepad2;
+    if (locked && (!lockRumble || !pad.isRumbling())) {
+      pad.rumble(1.0, 1.0, Gamepad.RUMBLE_DURATION_CONTINUOUS);
+    } else if (!locked && lockRumble) {
+      pad.stopRumble();
+    }
+    lockRumble = locked;
   }
 
   /**
@@ -231,7 +286,8 @@ public class BaseTeleop {
           robot.limelight.aimSource(), robot.limelight.hiveTagCount, robot.limelight.aimCorrectionDeg(),
           robot.limelight.distance, robot.limelight.aimedThresholdDeg(), robot.limelight.isAimed() ? " - AIMED" : "");
     } else {
-      telemetry.addData("Aim", "%s: no tags of the target CELL", robot.limelight.aimSource());
+      telemetry.addData("Aim", "%s: no tags of the target CELL  (gp2 right stick steers the turret)",
+          robot.limelight.aimSource());
     }
     if (robot.limelight.isTooClose()) {
       telemetry.addLine(String.format("TOO CLOSE: %.2f m to the opening (under %.2f): the formula's speed climbs, back up",
@@ -245,6 +301,10 @@ public class BaseTeleop {
       telemetry.addLine("WARNING: " + robot.limelight.tagsWithout3d
           + " tag(s) without a 3D pose (ignored): turn on Full 3D in this Limelight pipeline");
     }
+    telemetry.addData("Turret", "%.0f deg (270 = right, 180 = forward, 90 = left; limits %.0f..%.0f)%s",
+        robot.outtake.getTurretPosDegrees() + robot.getAllianceColor().getSteadyState(),
+        TurretTracker.TURRET_MIN_DEG, TurretTracker.TURRET_MAX_DEG,
+        robot.limelight.steerAtLimit() ? "  AT ITS LIMIT (the cable): steer the other way" : "");
     telemetry.addData("Turret error", robot.limelight.error);   // a number: plot it in Panels' Graph to tune AIM_*
     telemetry.addData("Pose", "x %.1f  y %.1f  h %.0f deg", p.x(), p.y(), Math.toDegrees(p.heading()));
     telemetry.addData("Pose from", "%s  (gp2 back = reset y at the audience wall)", poseSource);
