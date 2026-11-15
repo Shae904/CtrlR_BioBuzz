@@ -32,6 +32,9 @@ public class Intake {
   public static double FLOWER_DOWN = 0.74;
   public static double FLOWER_TWO_UP = 0.22;
   public static double FLOWER_TWO_DOWN = 0.58;
+  public static double FLOWER_INIT = 0;
+  public static double FLOWER_TWO_INIT = 0;
+
 
 
   public final ServoImplEx gate,flower,flower2;
@@ -50,7 +53,6 @@ public class Intake {
     flower = hardwareMap.get(ServoImplEx.class, "flower");
     flower2 = hardwareMap.get(ServoImplEx.class, "flower2");
     setFlapper(false); // starts DOWN (shut)
-    setFlowerStart();  // starts UP
   }
 
   /** Raises (true, open: feed) or lowers (false, shut: hold) the flapper. */
@@ -63,7 +65,7 @@ public class Intake {
     setFlowerPos(down ? FLOWER_DOWN : FLOWER_UP,down ? FLOWER_TWO_DOWN : FLOWER_TWO_UP);
   }
   public void setFlowerStart(){
-    setFlowerPos(FLOWER_UP,FLOWER_TWO_UP);
+    setFlowerPos(FLOWER_INIT,FLOWER_TWO_INIT);
   }
 
   public boolean isFlapperUp() {

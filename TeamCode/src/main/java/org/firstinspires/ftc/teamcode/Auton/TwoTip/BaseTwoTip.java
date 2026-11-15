@@ -136,6 +136,7 @@ public class BaseTwoTip extends BaseHiveAuto {
 
     // --- 1. from the start pose, shoot all 4 at the audience CELL: the third tips the HIVE ---
     phase = "AIM A";
+    robot.intake.setFlower(false);
     robot.outtake.setTargetVelocity(SPINUP_TICKS);
     preAim(cellA);
     aimUntilReady(AIM_A_TIMEOUT_MS);
@@ -220,6 +221,7 @@ public class BaseTwoTip extends BaseHiveAuto {
 
     // --- 1. out, line up at the audience CELL, shoot all 4: the third tips the HIVE ---
     phase = "DRIVE A";
+    robot.intake.setFlower(false);   // up at START, like the other autos (Intake no longer moves it at INIT)
     robot.outtake.setTargetVelocity(SPINUP_TICKS);
     driveTo(Paths.path(Paths.line(start, out).constant(start.heading()), Paths.line(out, shootA).linear(out, shootA)),
         DRIVE_TIMEOUT_MS);

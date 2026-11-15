@@ -69,6 +69,7 @@ public class BaseHive4 extends BaseHiveAuto {
 
     // --- drive out and line up ---
     phase = "DRIVE";
+    robot.intake.setFlower(false);
     Pose start = robot.follower.pose();
     Pose out = fieldPose(OUT_RED).withHeading(start.heading());
     Pose shoot = shootingPose(shootSpot(), cell);
