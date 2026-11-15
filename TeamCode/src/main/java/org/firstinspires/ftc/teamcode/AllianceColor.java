@@ -35,9 +35,10 @@ public enum AllianceColor {
 
   /**
    * The turret's rest direction and INIT position (turret position: 180 = shooting forward, 90 = left, 270 = right).
-   * The turret encoder zeroes at every INIT, so the turret must be pointing this way when INIT is pressed. Both
-   * alliances use the robot's right (270) since 2026-11-14; RED used the left (90) before, which put its shots on the
-   * battery side.
+   * The turret encoder zeroes at every AUTO's INIT, so the turret must be pointing this way when an AUTO's INIT is
+   * pressed (also the only way the robot is in sizing). The TELEOP keeps the zero it finds and leaves the turret
+   * where it is (Outtake, Subsystems.TurretSteer). Both alliances use the robot's right (270) since 2026-11-14; RED
+   * used the left (90) before, which put its shots on the battery side.
    */
   public abstract double getSteadyState();
 

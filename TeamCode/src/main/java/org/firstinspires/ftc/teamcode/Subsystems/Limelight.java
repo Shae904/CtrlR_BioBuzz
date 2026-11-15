@@ -134,13 +134,18 @@ public class Limelight {
 
   // Field-held aim (TurretTracker): camera delay, robot turning, lost tags
   private final TurretTracker tracker = new TurretTracker();
+  /** The TELEOP's target: gamepad2's stick, RB, and staying put when nobody aims (TurretSteer). */
+  private final TurretSteer steer = new TurretSteer();
   private double headingDeg;             // robot heading now (deg, CCW)
   private double robotXIn;
   private double robotYIn;
   private double yawRateDegS;            // robot turn rate (deg/s, CCW)
   private double lastFrameTimestamp = Double.NaN;
   private long lastAimCallNs;
-  /** Where the turret target came from: REST, VISION, HOLD (tags just lost), ODOMETRY (teleop pre-aim), LAST (autos). */
+  /**
+   * Where the turret target came from. Autos: REST, VISION, HOLD (tags just lost), LAST (their pre-aim). TELEOP
+   * (TurretSteer): PARKED, MANUAL (the stick), VISION, HOLD, LOST, ODOMETRY (RB's pre-aim), PARK-SEARCH.
+   */
   private String aimSource = "REST";
   private boolean wasAiming;
   private long odometryPreaimSinceNs = -1;   // when this aiming session's odometry pre-aim started (-1: not yet)
@@ -470,10 +475,10 @@ public class Limelight {
   }
 
   /**
-   * The turret target: at rest when not aiming; else the field direction of the last frames (VISION, or HOLD for
-   * TurretTracker.LOST_HOLD_MS after the tags are lost) for the robot's heading now; then, in the teleop (a target
-   * CELL), straight at that CELL's opening from odometry (ODOMETRY); in the autos, the pre-aim they set (LAST).
-   * Limited to the turret's range (TurretTracker.limit).
+   * The turret target in the AUTOS (the TELEOP uses {@link #updateTargetTeleop}): at rest when not aiming; else the
+   * field direction of the last frames (VISION, or HOLD for TurretTracker.LOST_HOLD_MS after the tags are lost) for the
+   * robot's heading now; then the pre-aim the auto set (LAST). (The ODOMETRY / REST-SEARCH branches only run with a
+   * target CELL, which the autos never set.) Limited to the turret's range (TurretTracker.limit).
    */
   public void updateTarget(double turretPos, boolean shouldAim, AllianceColor color) {
     long now = System.nanoTime();
@@ -509,6 +514,40 @@ public class Limelight {
     error = target - this.turretPosition;
   }
 
+  /**
+   * The TELEOP's turret target (TurretSteer): gamepad2's right stick steers the turret until the target CELL's tags
+   * are seen, then the Limelight holds them for as long as the stick stays off its centre; RB aims on its own as
+   * before; with neither the turret stays where it is (no return to the rest direction: only the autos need that).
+   *
+   * @param stickX      gamepad2's right stick, left/right (+ = right)
+   * @param stickActive that stick is off its centre, in any direction
+   */
+  public void updateTargetTeleop(double turretPos, boolean rbAim, double stickX, boolean stickActive,
+                                 AllianceColor color) {
+    long now = System.nanoTime();
+    this.turretPosition = turretPos + color.getSteadyState();
+    double odometryTarget = Double.NaN;
+    if (targetCell != null) {
+      double[] opening = openingIn(color, targetCell);
+      odometryTarget = TurretTracker.targetFromBearing(headingDeg,
+          TurretTracker.openingBearingDeg(robotXIn, robotYIn, Math.toRadians(headingDeg), opening[0], opening[1]));
+    }
+    target = steer.update(now, this.turretPosition, rbAim, stickX, stickActive, tracker.fixAgeMs(now),
+        this.hasValidTarget(), tracker.targetFromField(headingDeg), odometryTarget, ODOMETRY_PREAIM_TIMEOUT_MS);
+    aimSource = steer.source();
+    error = target - this.turretPosition;
+  }
+
+  /** TELEOP: the Limelight is aiming the turret (tags in view, or just lost and their direction held). */
+  public boolean isLocked() {
+    return steer.isLocked();
+  }
+
+  /** TELEOP: the stick is pushing the turret against its limit (the cable seam straight back): steer the other way. */
+  public boolean steerAtLimit() {
+    return steer.atLimit();
+  }
+
   /** Odometry pre-aim allowed: within ODOMETRY_PREAIM_TIMEOUT_MS of its start in this press (a fix restarts it). */
   private boolean preaimAllowed(long now) {
     if (odometryPreaimSinceNs < 0) {
@@ -528,7 +567,10 @@ public class Limelight {
     return new double[]{HiveTargeting.FIELD_IN - other[0], HiveTargeting.FIELD_IN - other[1]};
   }
 
-  /** Where the turret target comes from now: REST, VISION, HOLD, ODOMETRY, REST-SEARCH (pre-aim gave up) or LAST. */
+  /**
+   * Where the turret target comes from now. Autos: REST, VISION, HOLD or LAST. TELEOP: PARKED, MANUAL, VISION, HOLD,
+   * LOST, ODOMETRY or PARK-SEARCH (TurretSteer).
+   */
   public String aimSource() {
     return aimSource;
   }
@@ -541,16 +583,21 @@ public class Limelight {
     return Math.min(AIM_RGB_THRESHOLD, AIM_WINDOW_FRACTION * windowDeg);
   }
 
+  /** Nobody is aiming: the autos' rest direction, or the TELEOP's turret staying where it is. */
+  private boolean resting() {
+    return "REST".equals(aimSource) || TurretSteer.PARKED.equals(aimSource);
+  }
+
   /** The turret is on the target CELL's opening closely enough to shoot (what the light shows as aimed). */
   public boolean isAimed() {
-    return !"REST".equals(aimSource) && this.hasValidTarget() && Math.abs(error) < aimedThresholdDeg();
+    return !resting() && this.hasValidTarget() && Math.abs(error) < aimedThresholdDeg();
   }
 
 
   public double updateAimPID() { // returns the turn power from pid for autoaiming
     double dt = Math.min(aimTimer.seconds(), 0.1);   // the first call comes after the whole INIT wait
     aimTimer.reset();
-    if ("REST".equals(aimSource)) {
+    if (resting()) {
       aimIntegral = 0;                                // no windup while resting
     }
 
@@ -564,7 +611,7 @@ public class Limelight {
 
     // Light first (also inside the deadband): aimed = within a fraction of the opening's window from here
     double threshold = aimedThresholdDeg();
-    if ("REST".equals(aimSource)) {
+    if (resting()) {
       rgb.setPosition(.277);
     } else if (Math.abs(error) < threshold && this.hasValidTarget()) {
       rgb.setPosition(.5);
@@ -577,9 +624,11 @@ public class Limelight {
     }
 
     // The target moves with the robot's heading when it is held on the field: feed that rate forward (not for the
-    // rest direction or the autos' robot-relative pre-aim, which turn with the robot)
+    // rest direction or the autos' robot-relative pre-aim, which turn with the robot). Under the stick (MANUAL) the
+    // target moves at the speed the stick asks for: feed that forward, so the turret follows without lagging behind.
     boolean fieldHeld = "VISION".equals(aimSource) || "HOLD".equals(aimSource) || "ODOMETRY".equals(aimSource);
-    double feedForward = fieldHeld ? AIM_Kv * yawRateDegS : 0;
+    double feedForward = fieldHeld ? AIM_Kv * yawRateDegS
+        : TurretSteer.MANUAL.equals(aimSource) ? AIM_Kv * steer.steerRateDegS() : 0;
 
     // PID Output
     if (Math.abs(error) < AIM_DEADBAND) {
